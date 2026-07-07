@@ -12,7 +12,7 @@ minio:
 inference-gateway:
   enabled: true
 control-plane:
-  enabled: false # stub; ships in HOR-241+
+  enabled: false # enable to deploy the control-plane (identity store + operator); ships standalone via its own chart
 agent-fleet:
   enabled: false # stub; ships in HOR-248+
 

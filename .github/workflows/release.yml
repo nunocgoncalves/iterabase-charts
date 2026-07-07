@@ -46,7 +46,7 @@ jobs:
           helm package "charts/$CHART" --version "$VERSION" --destination .cr-release
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
           for pkg in .cr-release/*.tgz; do
-            helm push "$pkg" "oci://ghcr.io/${{ github.repository_owner }}/iterabase-charts/$CHART"
+            helm push "$pkg" "oci://ghcr.io/${{ github.repository_owner }}/iterabase-charts"
           done
       - name: github release
         uses: softprops/action-gh-release@v2

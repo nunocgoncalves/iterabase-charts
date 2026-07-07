@@ -1,6 +1,7 @@
 name: release
 
-# Publish charts to GHCR OCI.
+# Publish charts to GHCR OCI (grouped under iterabase-charts/) and create a
+# GitHub Release per chart tag with the packaged .tgz attached.
 # Triggered by per-chart tags: <chart-name>-<semver>, e.g.
 #   iterabase-platform-0.1.0, inference-gateway-0.1.0, control-plane-0.1.0, agent-fleet-0.1.0
 # The umbrella is packaged with dependencies baked in (helm dependency build first).
@@ -15,8 +16,8 @@ on:
       - "agent-fleet-*"
 
 permissions:
-  contents: read
-  packages: write
+  contents: write # create GitHub Releases
+  packages: write # push to GHCR
 
 jobs:
   release:
@@ -45,5 +46,11 @@ jobs:
           helm package "charts/$CHART" --version "$VERSION" --destination .cr-release
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
           for pkg in .cr-release/*.tgz; do
-            helm push "$pkg" "oci://ghcr.io/${{ github.repository_owner }}/$CHART"
+            helm push "$pkg" "oci://ghcr.io/${{ github.repository_owner }}/iterabase-charts/$CHART"
           done
+      - name: github release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: .cr-release/*.tgz
+          generate_release_notes: true

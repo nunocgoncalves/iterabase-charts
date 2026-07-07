@@ -20,7 +20,7 @@ control-plane and agent-fleet are **disabled stubs** until their services ship.
 
 ```sh
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-helm install iterabase oci://ghcr.io/nunocgoncalves/iterabase-platform \
+helm install iterabase oci://ghcr.io/nunocgoncalves/iterabase-charts/iterabase-platform \
   --version 0.1.0 -n iterabase-system --create-namespace
 ```
 

@@ -8,13 +8,13 @@ Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella ch
 |---|---|---|
 | `iterabase-platform` | Umbrella — composes all components | ✅ |
 | `inference-gateway` | Model-access service | ✅ |
-| `control-plane` | Substrate + durable engine (stub) | ✅ |
+| `control-plane` | Identity store + IdentityMapping operator + JWT/JWKS API | ✅ |
 | `agent-fleet` | The agent product (stub) | ✅ |
 | `postgresql` | Self-contained Postgres on the official image | bundled only |
 | `redis` | Self-contained Redis (hot-path cache) | bundled only |
 | `minio` | Self-contained MinIO object storage | bundled only |
 
-control-plane and agent-fleet are **disabled stubs** until their services ship.
+agent-fleet is a **disabled stub** until its service ships; control-plane ships standalone and is disabled in the umbrella by default (`control-plane.enabled=false`).
 
 ## Install
 
@@ -34,7 +34,7 @@ kubectl get secret iterabase-gateway-admin -n iterabase-system \
 ## Develop
 
 ```sh
-make check   # helm lint (all) + helm template (umbrella) + kubeconform
+make check   # helm lint (all) + helm template (umbrella + control-plane) + kubeconform
 ```
 
 Requires `helm` and `kubeconform`. `make build-deps` resolves the umbrella's local + `ingress-nginx` dependencies.

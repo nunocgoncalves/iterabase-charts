@@ -46,5 +46,5 @@ jobs:
       - name: assert gateway /health 200
         run: |
           kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=inference-gateway -n iterabase-system --timeout=180s
-          kubectl run health-probe --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- \
+          kubectl run health-probe -n iterabase-system --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- \
             curl -fsS "http://iterabase-gateway:8080/health"

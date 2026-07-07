@@ -1,0 +1,6 @@
+apiVersion: v2
+name: agent-fleet
+description: Iterabase agent-fleet service (the agent product). Stub — not yet implemented (HOR-248+).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

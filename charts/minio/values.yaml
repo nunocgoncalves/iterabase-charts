@@ -1,0 +1,17 @@
+enabled: true
+
+image:
+  repository: minio/minio
+  tag: RELEASE.2025-09-07T16-13-09Z
+  pullPolicy: IfNotPresent
+
+# Root credentials generated into a Secret on first install (stable via lookup).
+persistence:
+  storageClass: "" # use cluster default (k3s local-path)
+  size: 20Gi
+
+# Buckets to create on first start (mc init Job is a future harden); v1 deploys
+# the server only.
+buckets: []
+
+resources: {}

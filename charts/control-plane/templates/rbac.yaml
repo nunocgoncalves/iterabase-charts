@@ -1,0 +1,57 @@
+{{- if .Values.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "control-plane.serviceAccountName" . }}
+  labels:
+    {{- include "control-plane.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "control-plane.serviceAccountName" . }}
+  labels:
+    {{- include "control-plane.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - platform.iterabase.com
+  resources:
+  - identitymappings
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - platform.iterabase.com
+  resources:
+  - identitymappings/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - platform.iterabase.com
+  resources:
+  - identitymappings/status
+  verbs:
+  - get
+  - patch
+  - update
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "control-plane.serviceAccountName" . }}
+  labels:
+    {{- include "control-plane.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "control-plane.serviceAccountName" . }}
+subjects:
+- kind: ServiceAccount
+  name: {{ include "control-plane.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+{{- end }}

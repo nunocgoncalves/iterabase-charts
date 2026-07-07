@@ -27,6 +27,9 @@ spec:
       initContainers:
         - name: wait-for-postgres
           image: postgres:16-alpine
+          securityContext:
+            runAsUser: 999
+            runAsGroup: 999
           command:
             - sh
             - -c

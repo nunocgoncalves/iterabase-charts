@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+      - name: install kubeconform
+        run: |
+          curl -sLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz
+          tar -xzf kubeconform.tar.gz
+          sudo mv kubeconform /usr/local/bin/
+      - name: helm repo add ingress-nginx
+        run: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+      - name: check (lint + template + kubeconform)
+        run: make check
+
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+      - uses: helm/kind-action@v1
+        with:
+          version: v0.24.0
+      - name: helm repo add ingress-nginx
+        run: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+      - name: build deps
+        run: helm dependency build charts/iterabase-platform
+      - name: install umbrella (ingress-nginx off for kind)
+        run: |
+          helm install iterabase charts/iterabase-platform \
+            --create-namespace -n iterabase-system \
+            --set ingress-nginx.enabled=false \
+            --set inference-gateway.ingress.enabled=false \
+            --wait --timeout 6m
+      - name: assert gateway /health 200
+        run: |
+          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=inference-gateway -n iterabase-system --timeout=180s
+          kubectl run health-probe --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- \
+            curl -fsS "http://iterabase-gateway:8080/health"

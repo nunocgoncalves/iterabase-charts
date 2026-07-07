@@ -1,0 +1,10 @@
+enabled: false # stub; enable when the service ships (HOR-241+)
+
+image:
+  repository: ghcr.io/nunocgoncalves/control-plane
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+resources: {}

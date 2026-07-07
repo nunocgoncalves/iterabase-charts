@@ -1,0 +1,9 @@
+enabled: true
+
+image:
+  repository: redis
+  tag: "7-alpine"
+  pullPolicy: IfNotPresent
+
+# Redis is hot-path cache only (never source of truth); ephemeral storage in v1.
+resources: {}

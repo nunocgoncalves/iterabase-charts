@@ -1,0 +1,38 @@
+enabled: true
+
+image:
+  repository: ghcr.io/nunocgoncalves/inference-gateway
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  port: 8080
+
+ingress:
+  enabled: true
+  className: nginx
+  host: "" # catch-all when empty
+
+# PostgreSQL connection. Defaults match the bundled postgresql subchart.
+# To BYO: set postgresql.enabled=false (umbrella) and override these.
+postgresql:
+  host: "" # default: <release>-postgresql
+  port: 5432
+  database: gateway
+  username: gateway
+  passwordSecret: "" # default: <release>-postgresql
+  passwordKey: password
+
+# Redis connection. Defaults match the bundled redis subchart.
+redis:
+  host: "" # default: <release>-redis
+  port: 6379
+
+# Admin API key — generated into a Secret on first install (stable via lookup).
+adminApiKey:
+  secret: "" # default: <release>-gateway-admin
+  key: adminApiKey
+
+resources: {}

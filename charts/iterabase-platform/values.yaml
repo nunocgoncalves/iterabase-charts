@@ -1,0 +1,35 @@
+# iterabase-platform umbrella defaults (single-node).
+
+# --- Data deps (self-contained subcharts; disable + override to BYO) ---
+postgresql:
+  enabled: true
+redis:
+  enabled: true
+minio:
+  enabled: true
+
+# --- Services ---
+inference-gateway:
+  enabled: true
+control-plane:
+  enabled: false # stub; ships in HOR-241+
+agent-fleet:
+  enabled: false # stub; ships in HOR-248+
+
+# --- Ingress controller (bundled substrate) ---
+# hostNetwork DaemonSet binds 80/443 on the node across IPv4+IPv6.
+ingress-nginx:
+  enabled: true
+  controller:
+    kind: DaemonSet
+    hostNetwork: true
+    dnsPolicy: ClusterFirstWithHostNet
+    service:
+      enabled: false
+    hostPort:
+      enabled: true
+      ports:
+        http: 80
+        https: 443
+    metrics:
+      enabled: false

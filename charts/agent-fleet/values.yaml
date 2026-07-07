@@ -1,0 +1,10 @@
+enabled: false # stub; enable when the service ships (HOR-248+)
+
+image:
+  repository: ghcr.io/nunocgoncalves/agent-fleet
+  tag: latest
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+resources: {}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: redis
+description: Self-contained Redis for the iterabase platform (official image, hot-path cache).
+type: application
+version: 0.1.0
+appVersion: "7"

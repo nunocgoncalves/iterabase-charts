@@ -18,27 +18,6 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: gateway
     spec:
-      initContainers:
-        - name: wait-for-postgres
-          image: postgres:16-alpine
-          command:
-            - sh
-            - -c
-            - 'until pg_isready -h {{ include "inference-gateway.pgHost" . }} -p {{ .Values.postgresql.port }} -U {{ .Values.postgresql.username }}; do echo waiting for postgres; sleep 2; done'
-        - name: migrate
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args:
-            - migrate
-            - up
-          env:
-            - name: PGPASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "inference-gateway.pgSecret" . }}
-                  key: {{ .Values.postgresql.passwordKey }}
-            - name: DATABASE_URL
-              value: "postgres://{{ .Values.postgresql.username }}:$(PGPASSWORD)@{{ include "inference-gateway.pgHost" . }}:{{ .Values.postgresql.port }}/{{ .Values.postgresql.database }}?sslmode=disable"
       containers:
         - name: gateway
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"

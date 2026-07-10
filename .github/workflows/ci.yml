@@ -34,8 +34,10 @@ jobs:
           version: v0.24.0
       - name: helm repo add ingress-nginx
         run: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
-      - name: build deps
-        run: helm dependency build charts/iterabase-platform
+      - name: build deps (control-plane's nested postgresql first, then the umbrella)
+        run: |
+          helm dependency build charts/control-plane
+          helm dependency build charts/iterabase-platform
       - name: install umbrella (ingress-nginx off for kind)
         run: |
           helm install iterabase charts/iterabase-platform \

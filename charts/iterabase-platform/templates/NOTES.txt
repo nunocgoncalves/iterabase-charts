@@ -2,12 +2,11 @@ iterabase platform {{ .Chart.AppVersion }} installed as release "{{ .Release.Nam
 
 Components:
   inference-gateway: {{ (index .Values "inference-gateway").enabled }}
-  control-plane:     {{ (index .Values "control-plane").enabled }} (stub)
+  control-plane:     {{ (index .Values "control-plane").enabled }} (provides the shared pgvector Postgres + the schemas the gateway reads)
   agent-fleet:       {{ (index .Values "agent-fleet").enabled }} (stub)
-  postgresql:        {{ .Values.postgresql.enabled }}
   redis:             {{ .Values.redis.enabled }}
   minio:             {{ .Values.minio.enabled }}
   ingress-nginx:     {{ (index .Values "ingress-nginx").enabled }}
 
-Get the gateway admin API key:
-  kubectl get secret {{ .Release.Name }}-gateway-admin -n {{ .Release.Namespace }} -o jsonpath='{.data.adminApiKey}' | base64 -d
+Get the gateway admin API key (for /admin/v1/snapshot):
+  kubectl get secret {{ .Release.Name }}-inference-gateway-admin -n {{ .Release.Namespace }} -o jsonpath='{.data.adminApiKey}' | base64 -d

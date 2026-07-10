@@ -20,8 +20,8 @@ ingress:
 postgresql:
   host: "" # default: <release>-postgresql
   port: 5432
-  database: gateway
-  username: gateway
+  database: controlplane
+  username: controlplane
   passwordSecret: "" # default: <release>-postgresql
   passwordKey: password
 

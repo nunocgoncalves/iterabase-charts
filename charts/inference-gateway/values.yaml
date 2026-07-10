@@ -21,9 +21,9 @@ postgresql:
   host: "" # default: <release>-postgresql
   port: 5432
   database: controlplane
-  username: controlplane
+  username: gateway
   passwordSecret: "" # default: <release>-postgresql
-  passwordKey: password
+  passwordKey: gateway-password
 
 # Redis connection. Defaults match the bundled redis subchart.
 redis:

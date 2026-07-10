@@ -19,6 +19,12 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: database
     spec:
+      {{- if .Values.auth.gatewayUser.enabled }}
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: {{ include "postgresql.name" . }}-init
+      {{- end }}
       containers:
         - name: postgresql
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -35,6 +41,15 @@ spec:
                   key: password
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
+            {{- if .Values.auth.gatewayUser.enabled }}
+            - name: GATEWAY_USER
+              value: {{ .Values.auth.gatewayUser.username | quote }}
+            - name: GATEWAY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "postgresql.secretName" . }}
+                  key: gateway-password
+            {{- end }}
           ports:
             - name: tcp-postgresql
               containerPort: 5432
@@ -51,6 +66,10 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            {{- if .Values.auth.gatewayUser.enabled }}
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+            {{- end }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

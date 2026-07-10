@@ -51,6 +51,9 @@ postgresql:
   auth:
     username: controlplane
     database: controlplane
+    gatewayUser:
+      enabled: true
+      username: gateway
   # control-plane-local connection values (defaults match the subchart).
   host: "" # default: <release>-postgresql
   port: 5432

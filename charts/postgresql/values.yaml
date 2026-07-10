@@ -9,6 +9,9 @@ auth:
   username: gateway
   database: gateway
   # password is generated into a Secret on first install (stable via lookup).
+  gatewayUser:
+    enabled: false
+    username: gateway
 
 persistence:
   storageClass: "" # use cluster default (k3s local-path)

@@ -42,7 +42,7 @@ spec:
                   key: {{ .Values.adminApiKey.key }}
           readinessProbe:
             httpGet:
-              path: /health
+              path: /readyz
               port: http
             initialDelaySeconds: 5
             periodSeconds: 5

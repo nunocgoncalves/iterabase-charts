@@ -2,7 +2,7 @@ enabled: true
 
 image:
   repository: ghcr.io/nunocgoncalves/inference-gateway
-  tag: latest
+  tag: "0.2.0"
   pullPolicy: IfNotPresent
 
 replicaCount: 1

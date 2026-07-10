@@ -1,8 +1,8 @@
 # iterabase-platform umbrella defaults (single-node).
 
 # --- Data deps (self-contained subcharts; disable + override to BYO) ---
-postgresql:
-  enabled: true
+# Postgres is provided by the control-plane chart (pgvector); the gateway reads
+# the control-plane's schemas (catalog/identity/permissions) from it.
 redis:
   enabled: true
 minio:
@@ -12,7 +12,7 @@ minio:
 inference-gateway:
   enabled: true
 control-plane:
-  enabled: false # enable to deploy the control-plane (identity store + operator); ships standalone via its own chart
+  enabled: true # provides the shared pgvector Postgres + the schemas the gateway reads
 agent-fleet:
   enabled: false # stub; ships in HOR-248+
 

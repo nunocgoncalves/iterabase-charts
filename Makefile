@@ -21,7 +21,9 @@ template: build-deps
 	@echo "rendered $(RENDER)"
 
 kubeconform: template
-	kubeconform -strict -kubernetes-version 1.31.0 $(RENDER)
+	# The umbrella now renders the control-plane's CRDs (enabled by default);
+	# kubeconform's bundled schema set doesn't resolve apiextensions CRDs.
+	kubeconform -strict -kubernetes-version 1.31.0 -ignore-missing-schemas $(RENDER)
 
 # The umbrella keeps control-plane disabled by default, so validate the
 # control-plane chart standalone (renders with its own enabled=true default).

@@ -1,6 +1,6 @@
 # iterabase-charts
 
-Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella chart `iterabase-platform` deploys the platform (inference-gateway + control-plane + agent-fleet + Postgres/Redis/MinIO + ingress-nginx) and is a **standalone artifact** — install it with `helm` directly, Flux, Argo, or via [forge](https://github.com/nunocgoncalves/forge).
+Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella chart `iterabase-platform` deploys the platform (inference-gateway + control-plane + agent-fleet + Postgres/Redis/MinIO + ingress-nginx + cert-manager) and is a **standalone artifact** — install it with `helm` directly, Flux, Argo, or via [forge](https://github.com/nunocgoncalves/forge).
 
 ## Charts
 
@@ -13,6 +13,7 @@ Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella ch
 | `postgresql` | Self-contained Postgres on the official image | bundled only |
 | `redis` | Self-contained Redis (hot-path cache) | bundled only |
 | `minio` | Self-contained MinIO object storage | bundled only |
+| `cert-issuers` | cert-manager ClusterIssuers (Let's Encrypt DNS-01/Cloudflare + self-signed) | bundled only |
 
 agent-fleet is a **disabled stub** until its service ships; control-plane ships standalone and is disabled in the umbrella by default (`control-plane.enabled=false`).
 
@@ -37,7 +38,14 @@ kubectl get secret iterabase-gateway-admin -n iterabase-system \
 make check   # helm lint (all) + helm template (umbrella + control-plane) + kubeconform
 ```
 
-Requires `helm` and `kubeconform`. `make build-deps` resolves the umbrella's local + `ingress-nginx` dependencies.
+Requires `helm` and `kubeconform`. Add the external repos first:
+
+```sh
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo add jetstack https://charts.jetstack.io
+```
+
+`make build-deps` resolves the umbrella's local + `ingress-nginx` + `cert-manager` (jetstack) dependencies.
 
 ## Release
 

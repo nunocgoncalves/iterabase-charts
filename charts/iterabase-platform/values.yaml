@@ -33,3 +33,21 @@ ingress-nginx:
         https: 443
     metrics:
       enabled: false
+
+# --- cert-manager (edge TLS issuance) ---
+# cert-manager is the edge TLS operator (jetstack chart). The issuer CRs it
+# reconciles live in the `cert-issuers` subchart. Disable both for dev/kind
+# smoke (`--set cert-manager.enabled=false --set cert-issuers.enabled=false`);
+# enable `cert-issuers.letsencrypt` in the prod overlay (email + Cloudflare
+# token-ref).
+cert-manager:
+  enabled: true
+  crds:
+    enabled: true
+
+cert-issuers:
+  enabled: true
+  selfSigned:
+    enabled: true # kind/E2E — no real domain
+  letsencrypt:
+    enabled: false # enable in prod overlay (needs email + Cloudflare token)

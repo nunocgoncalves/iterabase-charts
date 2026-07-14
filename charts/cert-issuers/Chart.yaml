@@ -1,0 +1,6 @@
+apiVersion: v2
+name: cert-issuers
+description: cert-manager ClusterIssuers for the iterabase platform edge (Let's Encrypt DNS-01 via Cloudflare + self-signed for kind/E2E).
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

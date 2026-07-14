@@ -4,6 +4,13 @@ apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: {{ .Values.selfSigned.name | quote }}
+  annotations:
+    # cert-manager's CRD + validating webhook must be established before this CR
+    # can be created, so apply it as a post-install/post-upgrade hook (after
+    # `helm --wait` confirms cert-manager is Ready) rather than in the main
+    # release manifest (helm can't map a ClusterIssuer before its CRD exists).
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
   labels:
     {{- include "cert-issuers.labels" . | nindent 4 }}
 spec:

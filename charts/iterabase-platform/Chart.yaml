@@ -2,8 +2,8 @@ apiVersion: v2
 name: iterabase-platform
 description: Iterabase platform umbrella chart — inference-gateway + control-plane + agent-fleet + Postgres/Redis/MinIO + ingress-nginx.
 type: application
-version: 0.1.9
-appVersion: "0.1.9"
+version: 0.1.10
+appVersion: "0.1.10"
 dependencies:
   - name: redis
     version: 0.1.0

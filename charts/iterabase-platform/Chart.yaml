@@ -2,8 +2,8 @@ apiVersion: v2
 name: iterabase-platform
 description: Iterabase platform umbrella chart — inference-gateway + control-plane + agent-fleet + Postgres/Redis/MinIO + ingress-nginx.
 type: application
-version: 0.1.8
-appVersion: "0.1.8"
+version: 0.1.9
+appVersion: "0.1.9"
 dependencies:
   - name: redis
     version: 0.1.0
@@ -29,3 +29,11 @@ dependencies:
     version: 4.15.1
     repository: https://kubernetes.github.io/ingress-nginx
     condition: ingress-nginx.enabled
+  - name: cert-manager
+    version: v1.21.0
+    repository: https://charts.jetstack.io
+    condition: cert-manager.enabled
+  - name: cert-issuers
+    version: 0.1.0
+    repository: file://../cert-issuers
+    condition: cert-issuers.enabled

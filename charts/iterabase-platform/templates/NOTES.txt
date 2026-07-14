@@ -7,6 +7,8 @@ Components:
   redis:             {{ .Values.redis.enabled }}
   minio:             {{ .Values.minio.enabled }}
   ingress-nginx:     {{ (index .Values "ingress-nginx").enabled }}
+  cert-manager:      {{ (index .Values "cert-manager").enabled }} (edge TLS operator; issuers via cert-issuers)
+  cert-issuers:      {{ (index .Values "cert-issuers").enabled }}
 
 Get the gateway admin API key (for /admin/v1/snapshot):
   kubectl get secret {{ .Release.Name }}-inference-gateway-admin -n {{ .Release.Namespace }} -o jsonpath='{.data.adminApiKey}' | base64 -d

@@ -1,0 +1,27 @@
+enabled: true
+
+# cert-manager ClusterIssuers. The cert-manager operator itself is provided by
+# the umbrella's `cert-manager` dependency (jetstack chart); this subchart only
+# renders the issuer CRs the operator reconciles.
+
+# Self-signed ClusterIssuer — issues certificates with no external CA. Use for
+# kind/E2E where there is no real domain and no reachable ACME CA.
+selfSigned:
+  enabled: true
+  name: selfsigned
+
+# Let's Encrypt ClusterIssuer using DNS-01 via Cloudflare. DNS-01 needs no
+# ingress reachability for the challenge — only Cloudflare API access, sharing
+# the same API token external-dns consumes. Enable in prod overlays.
+letsencrypt:
+  enabled: false
+  name: letsencrypt-prod
+  server: https://acme-v02.api.letsencrypt.org/directory
+  email: "" # REQUIRED when enabled; set via the prod overlay
+  # Cloudflare API token — reference the SAME Secret external-dns uses. The
+  # Secret must already exist (created/provided by external-dns or the
+  # operator). Configure name/key via the overlay to match external-dns.
+  cloudflare:
+    tokenSecretRef:
+      name: cloudflare-api-token
+      key: api-token

@@ -19,8 +19,10 @@ jobs:
           curl -sLo kubeconform.tar.gz https://github.com/yannh/kubeconform/releases/download/v0.7.0/kubeconform-linux-amd64.tar.gz
           tar -xzf kubeconform.tar.gz
           sudo mv kubeconform /usr/local/bin/
-      - name: helm repo add ingress-nginx
-        run: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+      - name: helm repo add external chart repositories
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add jetstack https://charts.jetstack.io
       - name: check (lint + template + kubeconform)
         run: make check
 
@@ -32,18 +34,22 @@ jobs:
       - uses: helm/kind-action@v1
         with:
           version: v0.24.0
-      - name: helm repo add ingress-nginx
-        run: helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+      - name: helm repo add external chart repositories
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add jetstack https://charts.jetstack.io
       - name: build deps (control-plane's nested postgresql first, then the umbrella)
         run: |
           helm dependency build charts/control-plane
           helm dependency build charts/iterabase-platform
-      - name: install umbrella (ingress-nginx off for kind)
+      - name: install umbrella (edge components off for kind)
         run: |
           helm install iterabase charts/iterabase-platform \
             --create-namespace -n iterabase-system \
             --set ingress-nginx.enabled=false \
             --set inference-gateway.ingress.enabled=false \
+            --set cert-manager.enabled=false \
+            --set cert-issuers.enabled=false \
             --wait --timeout 6m
       - name: assert gateway /health 200
         run: |

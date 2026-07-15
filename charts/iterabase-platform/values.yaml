@@ -28,42 +28,52 @@ agent-fleet:
   enabled: false # stub; ships in HOR-248+
 
 # --- Ingress controller (bundled substrate) ---
-# Exposure mode: hostNetwork (single-node) vs LoadBalancer (HA/cloud). hostNetwork
-# binds 80/443 directly on the node (DaemonSet, no Service) — use on single-node
-# where 80/443 are free (kind/dev, OPO1 with nothing else on 80/443). When 80/443
-# are already taken — the GPU-E2E FailedScheduling on 80/443 — switch to the
-# LoadBalancer block below (MetalLB L2 with the node IP in the address pool on
-# bare-metal, or the cloud LB). external-dns (prod overlay) points the gateway
-# host's Cloudflare record at the controller's external address in either mode.
+# The edge is always a LoadBalancer Service (no hostNetwork). The LB
+# implementation is pluggable: MetalLB (L2) for bare-metal/kind/OPO1 — enable the
+# metallb + metallb-config deps below — or the cloud LB for cloud deploys (set
+# provider annotations on ingress-nginx.controller.service). external-dns (prod
+# overlay) points the gateway host's Cloudflare record at the LB's external
+# address. The service ipFamilies must match the MetalLB pool family below.
 ingress-nginx:
   enabled: true
   controller:
-    kind: DaemonSet
-    hostNetwork: true
-    dnsPolicy: ClusterFirstWithHostNet
+    kind: Deployment
+    hostNetwork: false
     service:
-      enabled: false
-    hostPort:
       enabled: true
-      ports:
-        http: 80
-        https: 443
+      type: LoadBalancer
+      # Dual-stack / family: must match the MetalLB pool addresses
+      # (metallb-config.addresses). Default IPv4; OPO1 = IPv6 (SingleStack,
+      # [IPv6]); dual-stack = PreferDualStack, [IPv4, IPv6].
+      ipFamilyPolicy: SingleStack
+      ipFamilies:
+        - IPv4
+    hostPort:
+      enabled: false
     metrics:
       enabled: false
-  # --- LoadBalancer mode (HA / OPO1 / cloud) ---
-  # Replace the `controller:` block above with this when hostNetwork 80/443
-  # conflict, or for HA. Requires a LoadBalancer implementation (MetalLB on
-  # bare-metal, the cloud LB otherwise); the LB's external IP is what external-dns
-  # publishes and Cloudflare proxies.
-  # controller:
-  #   kind: Deployment
-  #   hostNetwork: false
-  #   dnsPolicy: ClusterFirst
-  #   service:
-  #     enabled: true
-  #     type: LoadBalancer
-  #   hostPort:
-  #     enabled: false
+
+# --- MetalLB (LoadBalancer implementation for bare-metal/kind/OPO1) ---
+# The edge's LoadBalancer Service needs an LB implementation. On cloud, the cloud
+# LB provisions it (leave metallb disabled + set provider annotations on
+# ingress-nginx.controller.service). On bare-metal/kind/OPO1, enable MetalLB L2:
+# the community metallb chart (operator + speaker + CRDs) + metallb-config
+# (IPAddressPool + L2Advertisement CRs, post-install hooks). The pool addresses
+# (metallb-config.addresses) must match ingress-nginx.controller.service.ipFamilies.
+# Disabled by default; the kind preset (values-kind.yaml) + the OPO1 overlay
+# enable both. frrk8s is off (L2-only — no BGP/frr overhead).
+metallb:
+  enabled: false
+  crds:
+    enabled: true
+  frrk8s:
+    enabled: false
+
+metallb-config:
+  enabled: false
+  # addresses: set in the overlay (kind preset / OPO1). CIDR or range; family
+  # must match ingress-nginx.controller.service.ipFamilies.
+  addresses: []
 
 # --- cert-manager (edge TLS issuance) ---
 # cert-manager is the edge TLS operator (jetstack chart). The issuer CRs it

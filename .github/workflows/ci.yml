@@ -35,6 +35,19 @@ jobs:
       - uses: helm/kind-action@v1
         with:
           version: v0.24.0
+          # Map host 80/443 → the kind node so the hostNetwork ingress-nginx
+          # controller is reachable from the runner. The consolidated E2E curls
+          # https://<host>/... over the real edge (not an in-cluster port-forward).
+          config: |
+            kind: Cluster
+            apiVersion: kind.x-k8s.io/v1alpha4
+            nodes:
+              - role: control-plane
+                extraPortMappings:
+                  - containerPort: 80
+                    hostPort: 80
+                  - containerPort: 443
+                    hostPort: 443
       - name: helm repo add external chart repositories
         run: |
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
@@ -44,18 +57,52 @@ jobs:
         run: |
           helm dependency build charts/control-plane
           helm dependency build charts/iterabase-platform
-      - name: install umbrella (edge components off for kind)
+      - name: install umbrella (full HTTPS edge on for kind)
         run: |
+          # Defaults render the public edge: ingress-nginx (hostNetwork) +
+          # cert-manager + cert-issuers (self-signed) + the gateway Ingress
+          # (host + TLS). external-dns is off (no real Cloudflare zone in kind).
           helm install iterabase charts/iterabase-platform \
             --create-namespace -n iterabase-system \
-            --set ingress-nginx.enabled=false \
-            --set inference-gateway.ingress.enabled=false \
-            --set cert-manager.enabled=false \
-            --set cert-issuers.enabled=false \
             --set external-dns.enabled=false \
-            --wait --timeout 6m
-      - name: assert gateway /health 200
+            --wait --timeout 10m
+      - name: wait for cert-manager to issue the gateway TLS cert
         run: |
-          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=inference-gateway -n iterabase-system --timeout=180s
-          kubectl run health-probe -n iterabase-system --rm -i --restart=Never --image=curlimages/curl:8.10.1 -- \
-            curl -fsS "http://iterabase-gateway:8080/health"
+          # cert-issuers renders the `selfsigned` ClusterIssuer as a post-install
+          # hook (after cert-manager is Ready); wait for it, then for cert-manager's
+          # ingress-shim to issue the gateway cert into the TLS Secret.
+          for i in $(seq 1 60); do
+            kubectl get clusterissuer selfsigned >/dev/null 2>&1 && break
+            sleep 1
+          done
+          kubectl wait --for=condition=Ready clusterissuer selfsigned --timeout=120s
+          echo "waiting for gateway TLS Secret (iterabase-gateway-tls)..."
+          for i in $(seq 1 90); do
+            if [ -n "$(kubectl get secret iterabase-gateway-tls -n iterabase-system -o jsonpath='{.data.tls\.crt}' 2>/dev/null)" ]; then
+              echo "gateway TLS cert issued"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::gateway TLS cert was not issued in time"
+          kubectl get certificate -n iterabase-system -o yaml || true
+          exit 1
+      - name: assert gateway HTTPS /health 200 (consolidated E2E edge check)
+        run: |
+          # Reach the gateway over the real public edge: runner → 443 → kind →
+          # ingress-nginx (hostNetwork) → TLS (cert-manager self-signed) → gateway.
+          # -k: the self-signed cert is untrusted (kind/E2E); --resolve pins the
+          # host to localhost (the kind extraPortMapping). Retry to absorb the
+          # ingress-nginx rule-sync lag after it becomes Ready.
+          for i in $(seq 1 30); do
+            if curl -fsS -k --resolve gateway.iterabase.local:443:127.0.0.1 \
+              https://gateway.iterabase.local/health; then
+              echo "gateway HTTPS /health 200"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::gateway HTTPS /health did not return 200 in time"
+          kubectl get ingress -n iterabase-system -o wide || true
+          kubectl describe ingress -n iterabase-system || true
+          exit 1

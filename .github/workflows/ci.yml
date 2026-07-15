@@ -22,6 +22,7 @@ jobs:
       - name: helm repo add external chart repositories
         run: |
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add metallb https://metallb.github.io/metallb
           helm repo add jetstack https://charts.jetstack.io
           helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
       - name: check (lint + template + kubeconform)
@@ -35,28 +36,71 @@ jobs:
       - uses: helm/kind-action@v1
         with:
           version: v0.24.0
-          # Map host 443 → the kind node so the hostNetwork ingress-nginx
-          # controller is reachable from the runner. The consolidated E2E curls
-          # https://<host>/... over the real edge (not an in-cluster port-forward).
-          config: .github/kind-config.yaml
       - name: helm repo add external chart repositories
         run: |
           helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add metallb https://metallb.github.io/metallb
           helm repo add jetstack https://charts.jetstack.io
           helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
       - name: build deps (control-plane's nested postgresql first, then the umbrella)
         run: |
           helm dependency build charts/control-plane
           helm dependency build charts/iterabase-platform
-      - name: install umbrella (full HTTPS edge on for kind)
+      - name: compute MetalLB pool from the kind docker-bridge subnet
         run: |
-          # Defaults render the public edge: ingress-nginx (hostNetwork) +
-          # cert-manager + cert-issuers (self-signed) + the gateway Ingress
-          # (host + TLS). external-dns is off (no real Cloudflare zone in kind).
+          # The edge is a LoadBalancer Service; on kind, MetalLB L2 allocates the
+          # LB IP from a pool in the `kind` docker-bridge subnet (reachable from
+          # the runner host). Use the top of the /16 so it doesn't collide with
+          # the kind node's low container IPs.
+          subnet=$(docker network inspect kind -f '{{(index .IPAM.Config 0).Subnet}}')
+          base=$(echo "$subnet" | cut -d. -f1-2)
+          echo "kind subnet: $subnet -> pool base: $base"
+          cat > /tmp/kind-edge.yaml <<EOF
+          metallb:
+            enabled: true
+          metallb-config:
+            enabled: true
+            addresses:
+              - ${base}.255.200-${base}.255.250
+          EOF
+          cat /tmp/kind-edge.yaml
+      - name: install umbrella (LoadBalancer edge + MetalLB + TLS for kind)
+        run: |
+          # Defaults render the public edge: ingress-nginx (LoadBalancer) +
+          # cert-manager + cert-issuers (self-signed) + the gateway Ingress (host
+          # + TLS). MetalLB (from /tmp/kind-edge.yaml) provides the LB impl; the
+          # metallb-config CRs (post-install hooks) allocate the pool. external-dns
+          # is off (no real Cloudflare zone in kind).
           helm install iterabase charts/iterabase-platform \
             --create-namespace -n iterabase-system \
+            -f /tmp/kind-edge.yaml \
             --set external-dns.enabled=false \
-            --wait --timeout 10m
+            --wait --timeout 12m
+      - name: wait for MetalLB to assign the ingress-nginx LB IP
+        run: |
+          # metallb-config renders IPAddressPool + L2Advertisement as post-install
+          # hooks (after the MetalLB operator is Ready); wait for the pool, then
+          # for MetalLB to assign an external IP to the ingress-nginx controller
+          # Service.
+          for i in $(seq 1 60); do
+            [ -n "$(kubectl get ipaddresspool -n iterabase-system -o name 2>/dev/null)" ] && break
+            sleep 1
+          done
+          echo "waiting for LoadBalancer external IP on the ingress-nginx Service..."
+          for i in $(seq 1 90); do
+            LB_IP=$(kubectl get svc -n iterabase-system -l app.kubernetes.io/name=ingress-nginx \
+              -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+            if [ -n "$LB_IP" ]; then
+              echo "ingress-nginx LB IP: $LB_IP"
+              echo "$LB_IP" > /tmp/lb-ip
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::ingress-nginx LoadBalancer IP was not assigned in time"
+          kubectl get svc -n iterabase-system || true
+          kubectl get ipaddresspool,l2advertisement -A || true
+          exit 1
       - name: wait for cert-manager to issue the gateway TLS cert
         run: |
           # cert-issuers renders the `selfsigned` ClusterIssuer as a post-install
@@ -80,20 +124,21 @@ jobs:
           exit 1
       - name: assert gateway HTTPS /health 200 (consolidated E2E edge check)
         run: |
-          # Reach the gateway over the real public edge: runner → 443 → kind →
-          # ingress-nginx (hostNetwork) → TLS (cert-manager self-signed) → gateway.
-          # -k: the self-signed cert is untrusted (kind/E2E); --resolve pins the
-          # host to localhost (the kind extraPortMapping). Retry to absorb the
-          # ingress-nginx rule-sync lag after it becomes Ready.
+          # Reach the gateway over the real public edge: runner -> LB IP ->
+          # ingress-nginx (LoadBalancer, MetalLB-assigned) -> TLS (cert-manager
+          # self-signed) -> gateway. -k: the self-signed cert is untrusted
+          # (kind/E2E); --resolve pins the host to the MetalLB-assigned LB IP.
+          # Retry to absorb ingress-nginx rule-sync lag + MetalLB/ARP convergence.
+          LB_IP=$(cat /tmp/lb-ip)
           for i in $(seq 1 30); do
-            if curl -fsS -k --resolve gateway.iterabase.local:443:127.0.0.1 \
+            if curl -fsS -k --resolve gateway.iterabase.local:443:"$LB_IP" \
               https://gateway.iterabase.local/health; then
-              echo "gateway HTTPS /health 200"
+              echo "gateway HTTPS /health 200 (via LB $LB_IP)"
               exit 0
             fi
             sleep 2
           done
-          echo "::error::gateway HTTPS /health did not return 200 in time"
+          echo "::error::gateway HTTPS /health did not return 200 in time (LB $LB_IP)"
           kubectl get ingress -n iterabase-system -o wide || true
           kubectl describe ingress -n iterabase-system || true
           exit 1

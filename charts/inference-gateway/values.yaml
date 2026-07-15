@@ -13,7 +13,16 @@ service:
 ingress:
   enabled: true
   className: nginx
-  host: "" # catch-all when empty
+  host: "" # catch-all when empty (HTTP only); REQUIRED when tls.enabled (cert SAN)
+  # TLS via cert-manager. Enable alongside the umbrella's cert-manager +
+  # cert-issuers deps: clusterIssuer names a ClusterIssuer cert-issuers renders
+  # (selfsigned for kind/E2E, letsencrypt-prod for the prod overlay). cert-manager's
+  # ingress-shim issues the cert into secretName (stable across upgrades) and
+  # ingress-nginx serves it. Disable (tls.enabled=false) for a plain-HTTP edge.
+  tls:
+    enabled: false
+    secretName: "" # default: <release>-gateway-tls
+    clusterIssuer: "" # e.g. selfsigned (kind/E2E) / letsencrypt-prod (prod overlay)
   # external-dns integration (prod edge). When enabled, annotate this Ingress so
   # external-dns (source: ingress) creates the Cloudflare A record for the host.
   # Set inference-gateway.ingress.externalDns.enabled=true in the prod overlay

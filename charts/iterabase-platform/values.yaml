@@ -11,13 +11,30 @@ minio:
 # --- Services ---
 inference-gateway:
   enabled: true
+  ingress:
+    # Dev/kind default host (no real domain — pair with the self-signed issuer
+    # below). Override to the real public host in the prod overlay (e.g.
+    # gateway.opo1.example.com) alongside letsencrypt-prod + external-dns.
+    host: gateway.iterabase.local
+    tls:
+      # Public HTTPS edge via cert-manager. The umbrella enables cert-manager +
+      # cert-issuers by default; clusterIssuer references cert-issuers' self-signed
+      # issuer (kind/E2E). Set clusterIssuer=letsencrypt-prod in the prod overlay.
+      enabled: true
+      clusterIssuer: selfsigned # cert-issuers.selfSigned.name
 control-plane:
   enabled: true # provides the shared pgvector Postgres + the schemas the gateway reads
 agent-fleet:
   enabled: false # stub; ships in HOR-248+
 
 # --- Ingress controller (bundled substrate) ---
-# hostNetwork DaemonSet binds 80/443 on the node across IPv4+IPv6.
+# Exposure mode: hostNetwork (single-node) vs LoadBalancer (HA/cloud). hostNetwork
+# binds 80/443 directly on the node (DaemonSet, no Service) — use on single-node
+# where 80/443 are free (kind/dev, OPO1 with nothing else on 80/443). When 80/443
+# are already taken — the GPU-E2E FailedScheduling on 80/443 — switch to the
+# LoadBalancer block below (MetalLB L2 with the node IP in the address pool on
+# bare-metal, or the cloud LB). external-dns (prod overlay) points the gateway
+# host's Cloudflare record at the controller's external address in either mode.
 ingress-nginx:
   enabled: true
   controller:
@@ -33,6 +50,20 @@ ingress-nginx:
         https: 443
     metrics:
       enabled: false
+  # --- LoadBalancer mode (HA / OPO1 / cloud) ---
+  # Replace the `controller:` block above with this when hostNetwork 80/443
+  # conflict, or for HA. Requires a LoadBalancer implementation (MetalLB on
+  # bare-metal, the cloud LB otherwise); the LB's external IP is what external-dns
+  # publishes and Cloudflare proxies.
+  # controller:
+  #   kind: Deployment
+  #   hostNetwork: false
+  #   dnsPolicy: ClusterFirst
+  #   service:
+  #     enabled: true
+  #     type: LoadBalancer
+  #   hostPort:
+  #     enabled: false
 
 # --- cert-manager (edge TLS issuance) ---
 # cert-manager is the edge TLS operator (jetstack chart). The issuer CRs it

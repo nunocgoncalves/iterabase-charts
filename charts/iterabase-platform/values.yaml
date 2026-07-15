@@ -51,3 +51,39 @@ cert-issuers:
     enabled: true # kind/E2E — no real domain
   letsencrypt:
     enabled: false # enable in prod overlay (needs email + Cloudflare token)
+
+# --- external-dns (edge DNS → Cloudflare) ---
+# external-dns syncs the gateway Ingress host into Cloudflare (A record), sharing
+# the same Cloudflare API token Secret cert-issuers' Let's Encrypt DNS-01 solver
+# references. Disabled by default — there is no kind/E2E mode (it needs a real
+# Cloudflare zone + token); enable in the prod overlay.
+#
+# Prod overlay must:
+#   - set external-dns.enabled=true
+#   - set external-dns.domainFilters (e.g. ["opo1.example.com."]) to scope the zone
+#   - provision the cloudflare-api-token Secret out-of-band (External Secrets /
+#     SealedSecrets / manual) in this namespace — external-dns and cert-issuers
+#     both reference it by name/key below.
+#   - set inference-gateway.ingress.externalDns.enabled=true so the gateway
+#     Ingress is annotated with its host (external-dns then creates the A record).
+external-dns:
+  enabled: false
+  provider:
+    name: cloudflare
+  sources:
+    - ingress
+  policy: upsert-only # create/update only; never delete records (safe default; set `sync` in the overlay to also prune)
+  domainFilters: [] # REQUIRED when enabled — scope to your Cloudflare zone
+  # Cloudflare API token — same Secret cert-issuers.letsencrypt references.
+  env:
+    - name: CF_API_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: cloudflare-api-token # shared with cert-issuers.letsencrypt
+          key: api-token
+  extraArgs:
+    cloudflare-proxied: true # A records proxied through Cloudflare (orange cloud)
+  rbac:
+    create: true
+  serviceAccount:
+    create: true

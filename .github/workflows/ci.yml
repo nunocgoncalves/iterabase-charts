@@ -50,11 +50,19 @@ jobs:
         run: |
           # The edge is a LoadBalancer Service; on kind, MetalLB L2 allocates the
           # LB IP from a pool in the `kind` docker-bridge subnet (reachable from
-          # the runner host). Use the top of the /16 so it doesn't collide with
-          # the kind node's low container IPs.
-          subnet=$(docker network inspect kind -f '{{(index .IPAM.Config 0).Subnet}}')
+          # the runner host). The kind network is often dual-stack — enumerate
+          # all subnets and prefer IPv4 (simpler reachability from the host). Use
+          # the top of the /16 so it doesn't collide with the kind node's low
+          # container IPs.
+          subnets=$(docker network inspect kind -f '{{range .IPAM.Config}}{{.Subnet}}{{"\n"}}{{end}}')
+          echo "kind subnets: $subnets"
+          subnet=$(echo "$subnets" | grep -E '^[0-9]+\.' | head -1)
+          if [ -z "$subnet" ]; then
+            echo "::error::kind network has no IPv4 subnet ($(echo "$subnets" | tr '\n' ' '))"
+            exit 1
+          fi
           base=$(echo "$subnet" | cut -d. -f1-2)
-          echo "kind subnet: $subnet -> pool base: $base"
+          echo "using IPv4 subnet $subnet -> pool base $base"
           cat > /tmp/kind-edge.yaml <<EOF
           metallb:
             enabled: true

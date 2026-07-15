@@ -1,6 +1,6 @@
 # iterabase-charts
 
-Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella chart `iterabase-platform` deploys the platform (inference-gateway + control-plane + agent-fleet + Postgres/Redis/MinIO + ingress-nginx + cert-manager) and is a **standalone artifact** — install it with `helm` directly, Flux, Argo, or via [forge](https://github.com/nunocgoncalves/forge).
+Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella chart `iterabase-platform` deploys the platform (inference-gateway + control-plane + agent-fleet + Postgres/Redis/MinIO + ingress-nginx + cert-manager + external-dns) and is a **standalone artifact** — install it with `helm` directly, Flux, Argo, or via [forge](https://github.com/nunocgoncalves/forge).
 
 ## Charts
 
@@ -43,9 +43,10 @@ Requires `helm` and `kubeconform`. Add the external repos first:
 ```sh
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo add jetstack https://charts.jetstack.io
+helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
 ```
 
-`make build-deps` resolves the umbrella's local + `ingress-nginx` + `cert-manager` (jetstack) dependencies.
+`make build-deps` resolves the umbrella's local + `ingress-nginx` + `cert-manager` (jetstack) + `external-dns` dependencies.
 
 ## Release
 

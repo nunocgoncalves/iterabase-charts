@@ -14,6 +14,14 @@ ingress:
   enabled: true
   className: nginx
   host: "" # catch-all when empty
+  # external-dns integration (prod edge). When enabled, annotate this Ingress so
+  # external-dns (source: ingress) creates the Cloudflare A record for the host.
+  # Set inference-gateway.ingress.externalDns.enabled=true in the prod overlay
+  # alongside external-dns.enabled=true (umbrella). No-op on kind/E2E.
+  externalDns:
+    enabled: false
+    hostname: "" # DNS record name; defaults to ingress.host when empty
+    target: "" # optional A-record target (IP/host); if unset external-dns uses the Ingress status.loadBalancer
 
 # PostgreSQL connection. Defaults match the bundled postgresql subchart.
 # To BYO: set postgresql.enabled=false (umbrella) and override these.

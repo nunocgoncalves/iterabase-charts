@@ -1,9 +1,9 @@
 apiVersion: v2
 name: iterabase-platform
-description: Iterabase platform umbrella chart — inference-gateway + control-plane + agent-fleet + Postgres/Redis/MinIO + ingress-nginx.
+description: Iterabase platform umbrella chart — inference-gateway + control-plane + agent-fleet + Postgres/Redis/MinIO + ingress-nginx + cert-manager + external-dns.
 type: application
-version: 0.1.10
-appVersion: "0.1.10"
+version: 0.1.11
+appVersion: "0.1.11"
 dependencies:
   - name: redis
     version: 0.1.0
@@ -14,7 +14,7 @@ dependencies:
     repository: file://../minio
     condition: minio.enabled
   - name: inference-gateway
-    version: 0.2.2
+    version: 0.2.3
     repository: file://../inference-gateway
     condition: inference-gateway.enabled
   - name: control-plane
@@ -37,3 +37,7 @@ dependencies:
     version: 0.1.0
     repository: file://../cert-issuers
     condition: cert-issuers.enabled
+  - name: external-dns
+    version: 1.21.1
+    repository: https://kubernetes-sigs.github.io/external-dns/
+    condition: external-dns.enabled

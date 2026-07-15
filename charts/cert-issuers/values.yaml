@@ -18,9 +18,11 @@ letsencrypt:
   name: letsencrypt-prod
   server: https://acme-v02.api.letsencrypt.org/directory
   email: "" # REQUIRED when enabled; set via the prod overlay
-  # Cloudflare API token — reference the SAME Secret external-dns uses. The
-  # Secret must already exist (created/provided by external-dns or the
-  # operator). Configure name/key via the overlay to match external-dns.
+  # Cloudflare API token — reference the SAME Secret external-dns consumes
+  # (external-dns.env[CF_API_TOKEN]). The Secret must be provisioned out-of-band
+  # (External Secrets / SealedSecrets / manual) in this namespace; both
+  # external-dns and this issuer reference it by name/key. Configure name/key via
+  # the overlay to match external-dns.
   cloudflare:
     tokenSecretRef:
       name: cloudflare-api-token

@@ -1,6 +1,6 @@
 # iterabase-charts
 
-Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella chart `iterabase-platform` deploys the platform (inference-gateway + control-plane + agent-fleet + Postgres/Redis/MinIO + ingress-nginx + MetalLB + cert-manager + external-dns) and is a **standalone artifact** — install it with `helm` directly, Flux, Argo, or via [forge](https://github.com/nunocgoncalves/forge).
+Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella chart `iterabase-platform` deploys the platform (inference-gateway + control-plane + Postgres/Redis/MinIO + ingress-nginx + MetalLB + cert-manager + external-dns) and is a **standalone artifact** — install it with `helm` directly, Flux, Argo, or via [forge](https://github.com/nunocgoncalves/forge).
 
 ## Charts
 
@@ -9,14 +9,13 @@ Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella ch
 | `iterabase-platform` | Umbrella — composes all components | ✅ |
 | `inference-gateway` | Model-access service | ✅ |
 | `control-plane` | Identity store + IdentityMapping operator + JWT/JWKS API | ✅ |
-| `agent-fleet` | The agent product (stub) | ✅ |
 | `postgresql` | Self-contained Postgres on the official image | bundled only |
 | `redis` | Self-contained Redis (hot-path cache) | bundled only |
 | `minio` | Self-contained MinIO object storage | bundled only |
 | `cert-issuers` | cert-manager ClusterIssuers (Let's Encrypt DNS-01/Cloudflare + self-signed) | bundled only |
 | `metallb-config` | MetalLB IPAddressPool + L2Advertisement (L2 edge for bare-metal/kind/OPO1) | bundled only |
 
-agent-fleet is a **disabled stub** until its service ships; control-plane ships standalone and is disabled in the umbrella by default (`control-plane.enabled=false`).
+control-plane ships standalone and is enabled in the umbrella by default (it provides the shared pgvector Postgres + the schemas the gateway reads).
 
 ## Install
 

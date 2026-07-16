@@ -24,8 +24,6 @@ inference-gateway:
       clusterIssuer: selfsigned # cert-issuers.selfSigned.name
 control-plane:
   enabled: true # provides the shared pgvector Postgres + the schemas the gateway reads
-agent-fleet:
-  enabled: false # stub; ships in HOR-248+
 
 # --- Ingress controller (bundled substrate) ---
 # The edge is always a LoadBalancer Service (no hostNetwork). The LB

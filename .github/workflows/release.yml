@@ -3,7 +3,7 @@ name: release
 # Publish charts to GHCR OCI (grouped under iterabase-charts/) and create a
 # GitHub Release per chart tag with the packaged .tgz attached.
 # Triggered by per-chart tags: <chart-name>-<semver>, e.g.
-#   iterabase-platform-0.1.0, inference-gateway-0.1.0, control-plane-0.1.0, agent-fleet-0.1.0
+#   iterabase-platform-0.1.0, inference-gateway-0.1.0, control-plane-0.1.0
 # The umbrella is packaged with dependencies baked in (helm dependency build first).
 # Data-dep subcharts (postgresql/redis/minio) are bundled only — not released.
 
@@ -13,7 +13,6 @@ on:
       - "iterabase-platform-*"
       - "inference-gateway-*"
       - "control-plane-*"
-      - "agent-fleet-*"
 
 permissions:
   contents: write # create GitHub Releases

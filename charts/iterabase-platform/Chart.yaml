@@ -2,8 +2,8 @@ apiVersion: v2
 name: iterabase-platform
 description: Iterabase platform umbrella chart — inference-gateway + control-plane + agent-fleet + Postgres/Redis/MinIO + ingress-nginx + cert-manager + external-dns.
 type: application
-version: 0.1.13
-appVersion: "0.1.13"
+version: 0.1.14
+appVersion: "0.1.14"
 dependencies:
   - name: redis
     version: 0.1.0
@@ -34,7 +34,7 @@ dependencies:
     repository: https://metallb.github.io/metallb
     condition: metallb.enabled
   - name: metallb-config
-    version: 0.1.0
+    version: 0.1.1
     repository: file://../metallb-config
     condition: metallb-config.enabled
   - name: cert-manager

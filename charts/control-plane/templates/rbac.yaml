@@ -40,6 +40,7 @@ rules:
 - apiGroups:
   - platform.iterabase.com
   resources:
+  - egressroutes
   - identitymappings
   - modelbackends
   - models
@@ -55,6 +56,7 @@ rules:
 - apiGroups:
   - platform.iterabase.com
   resources:
+  - egressroutes/finalizers
   - identitymappings/finalizers
   - modelbackends/finalizers
   - models/finalizers
@@ -64,6 +66,7 @@ rules:
 - apiGroups:
   - platform.iterabase.com
   resources:
+  - egressroutes/status
   - identitymappings/status
   - modelbackends/status
   - models/status

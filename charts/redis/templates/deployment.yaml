@@ -18,18 +18,56 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: cache
     spec:
+      {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+      # fsGroup = redis (999) so the server reads the cert-manager-mounted
+      # tls.key (defaultMode 0640, root-owned, group redis).
+      securityContext:
+        fsGroup: 999
+      {{- end }}
+      {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ include "redis.name" . }}-tls
+            defaultMode: 0640
+      {{- end }}
       containers:
         - name: redis
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if or (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) .Values.auth.enabled }}
+          # sh -c so $REDIS_PASSWORD is expanded at runtime (not baked into the
+          # chart). With neither flag, the image default `redis-server` runs.
+          command:
+            - sh
+            - -c
+            - {{ include "redis.startCommand" . | quote }}
+          {{- end }}
+          env:
+            {{- if .Values.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "redis.secretName" . }}
+                  key: redis-password
+            {{- end }}
           ports:
             - name: tcp-redis
               containerPort: 6379
           readinessProbe:
             exec:
-              command: ["redis-cli", "ping"]
+              command:
+                - sh
+                - -c
+                - {{ include "redis.readyCommand" . | quote }}
             initialDelaySeconds: 5
             periodSeconds: 5
+          {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+          volumeMounts:
+            - name: tls
+              mountPath: /tls
+              readOnly: true
+          {{- end }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

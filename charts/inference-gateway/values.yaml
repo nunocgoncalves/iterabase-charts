@@ -2,7 +2,7 @@ enabled: true
 
 image:
   repository: ghcr.io/nunocgoncalves/inference-gateway
-  tag: "0.2.3"
+  tag: "0.2.4"
   pullPolicy: IfNotPresent
 
 replicaCount: 1
@@ -46,6 +46,19 @@ postgresql:
 redis:
   host: "" # default: <release>-redis
   port: 6379
+  passwordSecret: "" # default: <release>-redis (the redis chart's AUTH Secret)
+  passwordKey: redis-password
+
+# Internal TLS (opt-in; the umbrella's internalTLS.enabled fans this on). The
+# gateway is a TLS client only (no internal HTTPS server — its public edge is
+# via ingress-shim). When enabled: DATABASE_URL uses sslmode=verify-full + the
+# internal CA, REDIS_URL becomes rediss:// with the AUTH password, and
+# REDIS_TLS_CA_FILE points the gateway at the mounted CA. caSecretName is
+# required when enabled (the <release>-internal-ca-root Secret, set by umbrella).
+tls:
+  enabled: false
+  caSecretName: ""   # required when enabled: the internal CA root Secret
+  caMountPath: /etc/iterabase/internal-ca/ca.crt
 
 # Admin API key — generated into a Secret on first install (stable via lookup).
 adminApiKey:

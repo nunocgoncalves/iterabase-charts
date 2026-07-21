@@ -17,4 +17,16 @@ persistence:
   storageClass: "" # use cluster default (k3s local-path)
   size: 10Gi
 
+# Internal TLS (opt-in; the umbrella's internalTLS.enabled fans this on in prod).
+# When enabled, postgres serves TLS (ssl=on) with a cert-manager leaf cert from
+# the internal CA, and enforces hostssl (rejects plaintext). Clients connect with
+# sslmode=verify-full + the internal CA. Server-only: it presents a cert, never
+# verifies one (no mTLS), so caSecretName is unused here (kept for contract
+# uniformity with the other component charts).
+tls:
+  enabled: false
+  issuerName: internal-ca      # ClusterIssuer that signs the server leaf cert
+  caSecretName: ""             # unused by the server (set by umbrella for uniformity)
+  caMountPath: /etc/iterabase/internal-ca/ca.crt
+
 resources: {}

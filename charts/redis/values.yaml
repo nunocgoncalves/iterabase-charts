@@ -7,3 +7,20 @@ image:
 
 # Redis is hot-path cache only (never source of truth); ephemeral storage in v1.
 resources: {}
+
+# Internal TLS (opt-in; the umbrella's internalTLS.enabled fans this on in prod).
+# When enabled, redis serves TLS only (plaintext port disabled) with a cert-manager
+# leaf cert; --tls-auth-clients no (no mTLS). Server-only: it presents a cert,
+# never verifies one, so caSecretName is unused here (kept for contract uniformity).
+tls:
+  enabled: false
+  issuerName: internal-ca
+  caSecretName: ""
+  caMountPath: /etc/iterabase/internal-ca/ca.crt
+
+# AUTH (opt-in; paired with tls by the umbrella — TLS without AUTH is pointless
+# for a shared cache). A password generated into a Secret (stable via lookup);
+# clients pass it in the rediss:// URL.
+auth:
+  enabled: false
+  password: ""   # default: generated into <release>-redis (key redis-password)

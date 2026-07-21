@@ -27,6 +27,8 @@ jobs:
           helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
       - name: check (lint + template + kubeconform)
         run: make check
+      - name: check-tls (static render + kubeconform with internal TLS on)
+        run: make check-tls
 
   install:
     runs-on: ubuntu-latest
@@ -149,4 +151,105 @@ jobs:
           echo "::error::gateway HTTPS /health did not return 200 in time (LB $LB_IP)"
           kubectl get ingress -n iterabase-system -o wide || true
           kubectl describe ingress -n iterabase-system || true
+          exit 1
+
+  # Live TLS-on e2e (HOR-371): install the umbrella plaintext (brings cert-manager
+  # Ready + the selfsigned edge issuer), then `helm upgrade` with internal TLS on
+  # and assert the gateway serves /readyz 200 over the edge — proving the control-
+  # plane api (HTTPS), Postgres (verify-full), and Redis (rediss:// + AUTH) all
+  # came up over the internal CA. Two-phase because a fresh `helm install --wait`
+  # with TLS on deadlocks (pods wait on cert-manager-issued Secrets from
+  # post-install hooks, but --wait waits for pods before running hooks); the
+  # upgrade runs after cert-manager is Ready, so the cert hooks succeed.
+  install-tls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+      - uses: helm/kind-action@v1
+        with:
+          version: v0.24.0
+      - name: helm repo add external chart repositories
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add metallb https://metallb.github.io/metallb
+          helm repo add jetstack https://charts.jetstack.io
+          helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+      - name: build deps
+        run: |
+          helm dependency build charts/control-plane
+          helm dependency build charts/iterabase-platform
+      - name: compute MetalLB pool from the kind docker-bridge subnet
+        run: |
+          subnets=$(docker network inspect kind -f '{{range .IPAM.Config}}{{.Subnet}}{{"
+"}}{{end}}')
+          subnet=$(echo "$subnets" | grep -E '^[0-9]+\.' | head -1)
+          if [ -z "$subnet" ]; then echo "::error::no IPv4 kind subnet"; exit 1; fi
+          base=$(echo "$subnet" | cut -d. -f1-2)
+          cat > /tmp/kind-edge.yaml <<EOF
+          metallb:
+            enabled: true
+          metallb-config:
+            enabled: true
+            addresses:
+              - ${base}.255.200-${base}.255.250
+          EOF
+      - name: phase 1 — install plaintext (--wait brings cert-manager Ready)
+        run: |
+          helm install iterabase charts/iterabase-platform \
+            --create-namespace -n iterabase-system \
+            -f /tmp/kind-edge.yaml \
+            --set external-dns.enabled=false \
+            --wait --timeout 12m
+          kubectl wait --for=condition=Ready clusterissuer selfsigned --timeout=120s
+      - name: phase 2 — upgrade with internal TLS on (no --wait; cert hooks run now)
+        run: |
+          helm upgrade iterabase charts/iterabase-platform \
+            -n iterabase-system \
+            -f /tmp/kind-edge.yaml -f values-tls.yaml \
+            --set external-dns.enabled=false \
+            --timeout 10m
+      - name: wait for the internal CA + leaf certs to issue
+        run: |
+          # The internal CA ClusterIssuer is Ready once cert-manager has issued
+          # the root CA Certificate (post-upgrade hook). Then the component leaf
+          # certs (postgresql/redis/control-plane-api) issue from it.
+          for i in $(seq 1 60); do
+            kubectl get clusterissuer internal-ca >/dev/null 2>&1 && break
+            sleep 2
+          done
+          kubectl wait --for=condition=Ready clusterissuer internal-ca --timeout=180s
+          echo "waiting for component leaf certs to issue..."
+          kubectl wait --for=jsonpath='{.status.conditions[?(@.type=="Ready")].status}=True' \
+            certificate -n iterabase-system --all --timeout=180s || {
+            echo "::warning::not all certificates Ready"; kubectl get certificate -n iterabase-system || true; }
+      - name: wait for the gateway LB IP + pod Ready (proves Redis TLS startup)
+        run: |
+          for i in $(seq 1 90); do
+            LB_IP=$(kubectl get svc -n iterabase-system -l app.kubernetes.io/name=ingress-nginx \
+              -o jsonpath='{.items[0].status.loadBalancer.ingress[0].ip}' 2>/dev/null)
+            [ -n "$LB_IP" ] && break
+            sleep 2
+          done
+          echo "$LB_IP" > /tmp/lb-ip
+          # The gateway pod's startup rdb.Ping proves Redis TLS (rediss:// + CA);
+          # Ready proves the snapshot (Postgres verify-full) is fresh.
+          kubectl rollout status deploy -n iterabase-system -l app.kubernetes.io/name=inference-gateway --timeout=180s
+      - name: assert gateway HTTPS /readyz 200 (end-to-end internal TLS)
+        run: |
+          LB_IP=$(cat /tmp/lb-ip)
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' -k \
+              --resolve gateway.iterabase.local:443:"$LB_IP" \
+              https://gateway.iterabase.local/readyz)
+            if [ "$code" = "200" ]; then
+              echo "gateway HTTPS /readyz 200 (via LB $LB_IP) — internal TLS green"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::gateway /readyz not 200 (last=$code) — internal TLS failed"
+          kubectl get pods -n iterabase-system -o wide || true
+          kubectl logs -n iterabase-system -l app.kubernetes.io/name=inference-gateway --tail=40 || true
+          kubectl get certificate -n iterabase-system || true
           exit 1

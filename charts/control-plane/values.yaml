@@ -2,7 +2,7 @@ enabled: true # standalone install renders everything; the umbrella toggles this
 
 image:
   repository: ghcr.io/nunocgoncalves/control-plane
-  tag: "0.0.14"
+  tag: "0.0.15"
   pullPolicy: IfNotPresent
 
 # One image, two Deployments selected via command (see control-plane Dockerfile).
@@ -59,5 +59,22 @@ postgresql:
   port: 5432
   passwordSecret: "" # default: <release>-postgresql
   passwordKey: password
+  # Internal TLS for the bundled Postgres (mirrored to the postgresql subchart).
+  # The umbrella sets this together with the top-level tls.enabled below.
+  tls:
+    enabled: false
+    issuerName: internal-ca
+
+# Internal TLS for the control-plane itself (api HTTPS + Postgres client
+# verify-full). When enabled: the api serves HTTPS from a cert-manager leaf
+# cert (TLS_CERT_FILE/TLS_KEY_FILE), and DATABASE_URL uses sslmode=verify-full
+# + the internal CA (mounted read-only). The umbrella's internalTLS.enabled
+# fans this on; caSecretName is required when enabled (the
+# <release>-internal-ca-root Secret, set by the umbrella).
+tls:
+  enabled: false
+  issuerName: internal-ca
+  caSecretName: ""   # required when enabled: the internal CA root Secret
+  caMountPath: /etc/iterabase/internal-ca/ca.crt
 
 resources: {}

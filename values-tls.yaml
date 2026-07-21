@@ -1,0 +1,8 @@
+# TLS-on preset for the iterabase-platform umbrella (CI: static kubeconform via
+# `make check-tls` + the live `install-tls` kind e2e). Flips the single
+# internalTLS switch so every component enables in-cluster TLS off the internal
+# CA. kind/E2E stays plaintext by default (this file is opt-in). For the live
+# e2e, pair with the kind-edge MetalLB pool (computed in CI, like values-kind.yaml).
+global:
+  internalTLS:
+    enabled: true

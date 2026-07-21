@@ -44,15 +44,18 @@ spec:
                   key: {{ .Values.postgresql.passwordKey }}
             - name: DATABASE_URL
               value: {{ include "inference-gateway.databaseURL" . | quote }}
-            - name: REDIS_URL
-              value: {{ include "inference-gateway.redisURL" . | quote }}
             {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
-            # Redis AUTH password (k8s expands $(REDIS_PASSWORD) in REDIS_URL).
+            # REDIS_PASSWORD must precede REDIS_URL: k8s expands $(REDIS_PASSWORD)
+            # from previously-defined env vars only (like PGPASSWORD/DATABASE_URL).
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "inference-gateway.redisSecret" . }}
                   key: {{ .Values.redis.passwordKey }}
+            {{- end }}
+            - name: REDIS_URL
+              value: {{ include "inference-gateway.redisURL" . | quote }}
+            {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
             # Points the gateway's redisOptions at the internal CA for rediss:// verify.
             - name: REDIS_TLS_CA_FILE
               value: {{ .Values.tls.caMountPath | quote }}

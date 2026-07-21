@@ -181,8 +181,7 @@ jobs:
           helm dependency build charts/iterabase-platform
       - name: compute MetalLB pool from the kind docker-bridge subnet
         run: |
-          subnets=$(docker network inspect kind -f '{{range .IPAM.Config}}{{.Subnet}}{{"
-"}}{{end}}')
+          subnets=$(docker network inspect kind -f '{{range .IPAM.Config}}{{.Subnet}}{{"\n"}}{{end}}')
           subnet=$(echo "$subnets" | grep -E '^[0-9]+\.' | head -1)
           if [ -z "$subnet" ]; then echo "::error::no IPv4 kind subnet"; exit 1; fi
           base=$(echo "$subnet" | cut -d. -f1-2)

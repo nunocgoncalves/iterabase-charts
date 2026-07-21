@@ -236,8 +236,15 @@ jobs:
           kubectl rollout status deploy -n iterabase-system -l app.kubernetes.io/name=inference-gateway --timeout=180s || {
             echo "::error::gateway rollout did not finish — dumping diagnostics"
             kubectl get pods -n iterabase-system -o wide || true
-            kubectl describe deploy -n iterabase-system -l app.kubernetes.io/name=inference-gateway || true
-            kubectl logs -n iterabase-system -l app.kubernetes.io/name=inference-gateway --tail=50 || true
+            echo "--- postgres (iterabase-postgresql-0) ---"
+            kubectl logs -n iterabase-system iterabase-postgresql-0 --tail=50 || true
+            kubectl describe pod -n iterabase-system iterabase-postgresql-0 | tail -30 || true
+            echo "--- redis ---"
+            kubectl logs -n iterabase-system -l app.kubernetes.io/name=redis --tail=20 || true
+            echo "--- control-plane api ---"
+            kubectl logs -n iterabase-system -l app.kubernetes.io/name=control-plane,app.kubernetes.io/component=api --tail=20 || true
+            echo "--- gateway ---"
+            kubectl logs -n iterabase-system -l app.kubernetes.io/name=inference-gateway --tail=30 || true
             kubectl get certificate -n iterabase-system || true
             exit 1
           }

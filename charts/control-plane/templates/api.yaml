@@ -33,7 +33,13 @@ spec:
           command:
             - sh
             - -c
-            - 'until pg_isready -h {{ include "control-plane.pgHost" . }} -p {{ .Values.postgresql.port }} -U {{ .Values.postgresql.auth.username }}; do echo waiting for postgres; sleep 2; done'
+            - 'until pg_isready -h {{ include "control-plane.pgHost" . }} -p {{ .Values.postgresql.port }} -U {{ .Values.postgresql.auth.username }}{{ if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }} --sslmode=verify-full --sslrootcert={{ .Values.tls.caMountPath }}{{ end }}; do echo waiting for postgres; sleep 2; done'
+          {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+          volumeMounts:
+            - name: internal-ca
+              mountPath: {{ dir .Values.tls.caMountPath }}
+              readOnly: true
+          {{- end }}
         - name: migrate
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -47,6 +53,12 @@ spec:
                   key: {{ .Values.postgresql.passwordKey }}
             - name: DATABASE_URL
               value: {{ include "control-plane.databaseURL" . | quote }}
+          {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+          volumeMounts:
+            - name: internal-ca
+              mountPath: {{ dir .Values.tls.caMountPath }}
+              readOnly: true
+          {{- end }}
         - name: bootstrap
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -65,6 +77,12 @@ spec:
                   key: {{ .Values.postgresql.passwordKey }}
             - name: DATABASE_URL
               value: {{ include "control-plane.databaseURL" . | quote }}
+          {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+          volumeMounts:
+            - name: internal-ca
+              mountPath: {{ dir .Values.tls.caMountPath }}
+              readOnly: true
+          {{- end }}
       containers:
         - name: api
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -94,20 +112,42 @@ spec:
               value: {{ .Values.logLevel | default "info" | quote }}
             - name: LOG_FORMAT
               value: {{ .Values.logFormat | default "json" | quote }}
+            {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+            # Env-gated HTTPS: the api serves HTTPS when both are set (HOR-371),
+            # plain HTTP otherwise. The chart mounts the leaf cert at these paths.
+            - name: TLS_CERT_FILE
+              value: /etc/control-plane/tls/tls.crt
+            - name: TLS_KEY_FILE
+              value: /etc/control-plane/tls/tls.key
+            {{- end }}
           volumeMounts:
             - name: jwt
               mountPath: /etc/control-plane/jwt
               readOnly: true
+            {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+            - name: tls
+              mountPath: /etc/control-plane/tls
+              readOnly: true
+            - name: internal-ca
+              mountPath: {{ dir .Values.tls.caMountPath }}
+              readOnly: true
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /readyz
               port: http
+              {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+              scheme: HTTPS
+              {{- end }}
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
             httpGet:
               path: /healthz
               port: http
+              {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+              scheme: HTTPS
+              {{- end }}
             initialDelaySeconds: 15
             periodSeconds: 10
           securityContext:
@@ -126,4 +166,18 @@ spec:
             items:
               - key: private.pem
                 path: private.pem
+        {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+        - name: tls
+          secret:
+            secretName: {{ include "control-plane.apiTLSSecretName" . }}
+            defaultMode: 0640
+        # The internal CA root Secret — mount ONLY ca.crt (never tls.key, the CA
+        # private key) for client-side verify-full.
+        - name: internal-ca
+          secret:
+            secretName: {{ required "control-plane.tls.caSecretName is required when tls.enabled" (include "control-plane.tlsCASecretName" .) | quote }}
+            items:
+              - key: ca.crt
+                path: ca.crt
+        {{- end }}
 {{- end }}

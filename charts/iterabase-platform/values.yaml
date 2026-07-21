@@ -1,5 +1,17 @@
 # iterabase-platform umbrella defaults (single-node).
 
+# --- Internal TLS (opt-in; the prod overlay flips this one switch) ---
+# When true, every component enables in-cluster TLS off the internal CA
+# (cert-issuers.internal): Postgres (ssl=on + hostssl), Redis (TLS + AUTH),
+# the control-plane API (HTTPS), and the gateway connects with verify-full +
+# rediss://. Propagated to subcharts via `global.internalTLS` (helm shares
+# `global.*` with subcharts); each subchart reads it with a local override
+# escape hatch. Default false -> plaintext (kind/E2E). The CA Secret name is
+# computed (<release>-internal-ca-root), so the overlay sets only `enabled`.
+global:
+  internalTLS:
+    enabled: false
+
 # --- Data deps (self-contained subcharts; disable + override to BYO) ---
 # Postgres is provided by the control-plane chart (pgvector); the gateway reads
 # the control-plane's schemas (catalog/identity/permissions) from it.

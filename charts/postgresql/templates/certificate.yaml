@@ -1,0 +1,29 @@
+{{- if and .Values.enabled (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+{{- $name := include "postgresql.name" . }}
+{{- $ns := .Release.Namespace }}
+# Server leaf cert for Postgres TLS. SANs cover the Service DNS names clients
+# connect with (sslmode=verify-full checks the hostname). Issued by the internal
+# CA ClusterIssuer; cert-manager rotates it (90d). A post-install hook so it is
+# created after cert-manager + the internal CA are Ready.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $name }}-tls
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "20"
+spec:
+  secretName: {{ $name }}-tls
+  duration: 2160h      # 90d
+  renewBefore: 360h    # 15d
+  dnsNames:
+    - {{ $name }}
+    - {{ printf "%s.%s" $name $ns }}
+    - {{ printf "%s.%s.svc" $name $ns }}
+    - {{ printf "%s.%s.svc.cluster.local" $name $ns }}
+  issuerRef:
+    name: {{ .Values.tls.issuerName | quote }}
+    kind: ClusterIssuer
+{{- end }}

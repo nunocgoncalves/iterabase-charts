@@ -18,6 +18,17 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: gateway
     spec:
+      {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+      volumes:
+        # Internal CA root — ca.crt only (never tls.key, the CA private key) for
+        # client-side verify (Postgres verify-full + Redis RootCAs).
+        - name: internal-ca
+          secret:
+            secretName: {{ required "inference-gateway.tls.caSecretName is required when tls.enabled" (include "inference-gateway.tlsCASecretName" .) | quote }}
+            items:
+              - key: ca.crt
+                path: ca.crt
+      {{- end }}
       containers:
         - name: gateway
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -32,14 +43,31 @@ spec:
                   name: {{ include "inference-gateway.pgSecret" . }}
                   key: {{ .Values.postgresql.passwordKey }}
             - name: DATABASE_URL
-              value: "postgres://{{ .Values.postgresql.username }}:$(PGPASSWORD)@{{ include "inference-gateway.pgHost" . }}:{{ .Values.postgresql.port }}/{{ .Values.postgresql.database }}?sslmode=disable"
+              value: {{ include "inference-gateway.databaseURL" . | quote }}
             - name: REDIS_URL
-              value: "redis://{{ include "inference-gateway.redisHost" . }}:{{ .Values.redis.port }}/0"
+              value: {{ include "inference-gateway.redisURL" . | quote }}
+            {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+            # Redis AUTH password (k8s expands $(REDIS_PASSWORD) in REDIS_URL).
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "inference-gateway.redisSecret" . }}
+                  key: {{ .Values.redis.passwordKey }}
+            # Points the gateway's redisOptions at the internal CA for rediss:// verify.
+            - name: REDIS_TLS_CA_FILE
+              value: {{ .Values.tls.caMountPath | quote }}
+            {{- end }}
             - name: ADMIN_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ include "inference-gateway.adminSecretName" . }}
                   key: {{ .Values.adminApiKey.key }}
+          {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+          volumeMounts:
+            - name: internal-ca
+              mountPath: {{ dir .Values.tls.caMountPath }}
+              readOnly: true
+          {{- end }}
           readinessProbe:
             httpGet:
               path: /readyz

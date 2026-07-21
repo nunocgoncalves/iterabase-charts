@@ -19,16 +19,47 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: database
     spec:
-      {{- if .Values.auth.gatewayUser.enabled }}
+      {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+      # fsGroup = postgres (999) so the server process can read the
+      # cert-manager-mounted tls.key (defaultMode 0640, root-owned, group postgres).
+      securityContext:
+        fsGroup: 999
+      {{- end }}
       volumes:
+        {{- if .Values.auth.gatewayUser.enabled }}
         - name: init-scripts
           configMap:
             name: {{ include "postgresql.name" . }}-init
-      {{- end }}
+        {{- end }}
+        {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+        - name: tls
+          secret:
+            secretName: {{ include "postgresql.name" . }}-tls
+            defaultMode: 0640
+        - name: pghba
+          configMap:
+            name: {{ include "postgresql.name" . }}-pghba
+            items:
+              - key: pg_hba.conf
+                path: pg_hba.conf
+        {{- end }}
       containers:
         - name: postgresql
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+          # The official entrypoint prepends `postgres` when the first arg starts
+          # with `-`, so these -c flags reach the postgres process directly.
+          args:
+            - -c
+            - ssl=on
+            - -c
+            - ssl_cert_file=/var/lib/postgresql/tls/tls.crt
+            - -c
+            - ssl_key_file=/var/lib/postgresql/tls/tls.key
+            - -c
+            - hba_file=/etc/postgresql/pg_hba.conf
+          {{- end }}
           env:
             - name: POSTGRES_USER
               value: {{ .Values.auth.username | quote }}
@@ -61,6 +92,9 @@ spec:
                 - {{ .Values.auth.username | quote }}
                 - -d
                 - {{ .Values.auth.database | quote }}
+                {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+                - --sslmode=require
+                {{- end }}
             initialDelaySeconds: 5
             periodSeconds: 5
           volumeMounts:
@@ -69,6 +103,15 @@ spec:
             {{- if .Values.auth.gatewayUser.enabled }}
             - name: init-scripts
               mountPath: /docker-entrypoint-initdb.d
+            {{- end }}
+            {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+            - name: tls
+              mountPath: /var/lib/postgresql/tls
+              readOnly: true
+            - name: pghba
+              mountPath: /etc/postgresql/pg_hba.conf
+              subPath: pg_hba.conf
+              readOnly: true
             {{- end }}
           {{- with .Values.resources }}
           resources:

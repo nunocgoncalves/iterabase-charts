@@ -27,7 +27,20 @@
 {{- end -}}
 
 {{- define "control-plane.databaseURL" -}}
-postgres://{{ .Values.postgresql.auth.username }}:$(PGPASSWORD)@{{ include "control-plane.pgHost" . }}:{{ .Values.postgresql.port }}/{{ .Values.postgresql.auth.database }}?sslmode=disable
+{{- $ssl := "disable" -}}
+{{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) -}}{{- $ssl = printf "verify-full&sslrootcert=%s" .Values.tls.caMountPath -}}{{- end -}}
+postgres://{{ .Values.postgresql.auth.username }}:$(PGPASSWORD)@{{ include "control-plane.pgHost" . }}:{{ .Values.postgresql.port }}/{{ .Values.postgresql.auth.database }}?sslmode={{ $ssl }}
+{{- end -}}
+
+{{- define "control-plane.apiTLSSecretName" -}}
+{{- printf "%s-control-plane-api-tls" .Release.Name -}}
+{{- end -}}
+
+{{- /* The internal CA root Secret name. Local override -> global -> the
+     <release>-internal-ca-root convention (what cert-issuers creates), so the
+     overlay never hardcodes the release name. */ -}}
+{{- define "control-plane.tlsCASecretName" -}}
+{{- .Values.tls.caSecretName | default (dig "internalTLS" "caSecretName" "" (.Values.global | default (dict))) | default (printf "%s-internal-ca-root" .Release.Name) -}}
 {{- end -}}
 
 {{- define "control-plane.labels" -}}

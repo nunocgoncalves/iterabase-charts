@@ -25,6 +25,16 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+      {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+      volumes:
+        # Internal CA root — ca.crt only (never tls.key) for client verify-full.
+        - name: internal-ca
+          secret:
+            secretName: {{ required "control-plane.tls.caSecretName is required when tls.enabled" (include "control-plane.tlsCASecretName" .) | quote }}
+            items:
+              - key: ca.crt
+                path: ca.crt
+      {{- end }}
       initContainers:
         - name: wait-for-postgres
           image: postgres:16-alpine
@@ -34,7 +44,13 @@ spec:
           command:
             - sh
             - -c
-            - 'until pg_isready -h {{ include "control-plane.pgHost" . }} -p {{ .Values.postgresql.port }} -U {{ .Values.postgresql.auth.username }}; do echo waiting for postgres; sleep 2; done'
+            - 'until pg_isready -h {{ include "control-plane.pgHost" . }} -p {{ .Values.postgresql.port }} -U {{ .Values.postgresql.auth.username }}{{ if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }} --sslmode=verify-full --sslrootcert={{ .Values.tls.caMountPath }}{{ end }}; do echo waiting for postgres; sleep 2; done'
+          {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+          volumeMounts:
+            - name: internal-ca
+              mountPath: {{ dir .Values.tls.caMountPath }}
+              readOnly: true
+          {{- end }}
       containers:
         - name: manager
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -57,6 +73,12 @@ spec:
           ports:
             - name: health
               containerPort: 8081
+          {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+          volumeMounts:
+            - name: internal-ca
+              mountPath: {{ dir .Values.tls.caMountPath }}
+              readOnly: true
+          {{- end }}
           securityContext:
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false

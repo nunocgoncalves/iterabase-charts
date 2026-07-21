@@ -33,8 +33,15 @@ spec:
           command:
             - sh
             - -c
-            - 'until pg_isready -h {{ include "control-plane.pgHost" . }} -p {{ .Values.postgresql.port }} -U {{ .Values.postgresql.auth.username }}{{ if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }} --sslmode=verify-full --sslrootcert={{ .Values.tls.caMountPath }}{{ end }}; do echo waiting for postgres; sleep 2; done'
+            - 'until pg_isready -h {{ include "control-plane.pgHost" . }} -p {{ .Values.postgresql.port }} -U {{ .Values.postgresql.auth.username }}; do echo waiting for postgres; sleep 2; done'
           {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+          env:
+            # pg_isready doesn't accept --sslmode; libpq reads these env vars,
+            # so the readiness check connects over TLS (verify-full) like clients.
+            - name: PGSSLMODE
+              value: verify-full
+            - name: PGSSLROOTCERT
+              value: {{ .Values.tls.caMountPath | quote }}
           volumeMounts:
             - name: internal-ca
               mountPath: {{ dir .Values.tls.caMountPath }}

@@ -92,9 +92,9 @@ spec:
                 - {{ .Values.auth.username | quote }}
                 - -d
                 - {{ .Values.auth.database | quote }}
-                {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
-                - --sslmode=require
-                {{- end }}
+                # No --sslmode: pg_isready doesn't support it. Without -h it
+                # uses the unix socket (local all all trust), which works
+                # regardless of TLS — readiness just checks the server is up.
             initialDelaySeconds: 5
             periodSeconds: 5
           volumeMounts:

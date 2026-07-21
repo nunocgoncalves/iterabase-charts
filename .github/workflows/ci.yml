@@ -233,7 +233,14 @@ jobs:
           echo "$LB_IP" > /tmp/lb-ip
           # The gateway pod's startup rdb.Ping proves Redis TLS (rediss:// + CA);
           # Ready proves the snapshot (Postgres verify-full) is fresh.
-          kubectl rollout status deploy -n iterabase-system -l app.kubernetes.io/name=inference-gateway --timeout=180s
+          kubectl rollout status deploy -n iterabase-system -l app.kubernetes.io/name=inference-gateway --timeout=180s || {
+            echo "::error::gateway rollout did not finish — dumping diagnostics"
+            kubectl get pods -n iterabase-system -o wide || true
+            kubectl describe deploy -n iterabase-system -l app.kubernetes.io/name=inference-gateway || true
+            kubectl logs -n iterabase-system -l app.kubernetes.io/name=inference-gateway --tail=50 || true
+            kubectl get certificate -n iterabase-system || true
+            exit 1
+          }
       - name: assert gateway HTTPS /readyz 200 (end-to-end internal TLS)
         run: |
           LB_IP=$(cat /tmp/lb-ip)

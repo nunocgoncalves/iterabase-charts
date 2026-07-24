@@ -44,7 +44,7 @@ spec:
             - {{ include "redis.startCommand" . | quote }}
           {{- end }}
           env:
-            {{- if .Values.auth.enabled }}
+            {{- if (or .Values.auth.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:

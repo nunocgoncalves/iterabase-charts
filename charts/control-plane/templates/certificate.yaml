@@ -4,7 +4,10 @@
 # API server leaf cert. SANs cover the Service DNS names (future in-cluster
 # callers like the §7 egress plane) PLUS localhost + 127.0.0.1 so the admin
 # port-forward (kubectl port-forward -> https://localhost:<port>) verifies
-# cleanly under sslmode-equivalent hostname checking. Post-install hook.
+# cleanly under sslmode-equivalent hostname checking. Pre-install/pre-upgrade
+# hook (weight after the CA) so the Certificate exists before the api
+# Deployment starts. The Go server (ListenAndServeTLS) loads TLS material at
+# startup only — a renewed Secret needs a restart; see docs/internal-tls-rotation.md.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -12,7 +15,7 @@ metadata:
   labels:
     {{- include "control-plane.labels" . | nindent 4 }}
   annotations:
-    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook: pre-install,pre-upgrade
     helm.sh/hook-weight: "20"
 spec:
   secretName: {{ include "control-plane.apiTLSSecretName" . }}

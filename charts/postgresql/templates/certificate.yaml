@@ -7,8 +7,9 @@
 # Pre-install/pre-upgrade hook (weight after the CA) so the Certificate exists
 # before the StatefulSet pods start — see charts/cert-issuers for the ordering
 # rationale. PostgreSQL reads ssl_cert_file/ssl_key_file at startup (and on
-# SIGHUP); a renewed Secret does NOT auto-reload the server — see
-# docs/internal-tls-rotation.md.
+# SIGHUP); a renewed Secret does NOT auto-reload the server, so the StatefulSet
+# is annotated for Stakater Reloader to restart it on Secret change (umbrella
+# `reloader` dependency, enabled with internalTLS).
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:

@@ -19,6 +19,13 @@ spec:
         app.kubernetes.io/name: control-plane
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: api
+      {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+      annotations:
+        # Stakater Reloader restarts the pod when cert-manager renews the mounted
+        # <release>-control-plane-api-tls Secret, so the Go server (ListenAndServeTLS,
+        # startup-only TLS) serves the renewed leaf instead of the expired one.
+        reloader.stakater.com/auto: "true"
+      {{- end }}
     spec:
       securityContext:
         runAsNonRoot: true

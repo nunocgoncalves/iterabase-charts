@@ -103,6 +103,17 @@ cert-issuers:
   letsencrypt:
     enabled: false # enable in prod overlay (needs email + Cloudflare token)
 
+# --- Stakater Reloader (cert reload for internal TLS) ---
+# When internalTLS is on, cert-manager renews the mounted cert Secrets (90d,
+# renewBefore 15d) but the TLS servers (Postgres/Redis/control-plane API) do not
+# hot-reload TLS material. Reloader watches the mounted Secrets and triggers a
+# rollout when one updates, so a renewed leaf is picked up without a manual
+# restart. The TLS-serving workloads carry reloader.stakater.com/auto only while
+# TLS is enabled. Disabled by default (kind/E2E plaintext has no annotated
+# workloads); flip on with internalTLS (see values-tls.yaml / the prod overlay).
+reloader:
+  enabled: false
+
 # --- external-dns (edge DNS → Cloudflare) ---
 # external-dns syncs the gateway Ingress host into Cloudflare (A record), sharing
 # the same Cloudflare API token Secret cert-issuers' Let's Encrypt DNS-01 solver

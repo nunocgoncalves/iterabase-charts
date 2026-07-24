@@ -18,6 +18,13 @@ spec:
         app.kubernetes.io/name: postgresql
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: database
+      {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+      annotations:
+        # Stakater Reloader restarts the pod when cert-manager renews the mounted
+        # <release>-postgresql-tls Secret, so the server serves the renewed leaf
+        # instead of the expired one (PG loads ssl_cert/key at startup/SIGHUP).
+        reloader.stakater.com/auto: "true"
+      {{- end }}
     spec:
       {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
       # fsGroup = postgres (999) so the server process can read the

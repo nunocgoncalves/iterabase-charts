@@ -45,3 +45,11 @@ dependencies:
     version: 1.21.1
     repository: https://kubernetes-sigs.github.io/external-dns/
     condition: external-dns.enabled
+  # Stakater Reloader: restarts TLS-serving workloads when cert-manager renews
+  # their mounted cert Secret (HOR-371 internal TLS). Enabled alongside
+  # internalTLS (see values-tls.yaml / the prod overlay); a no-op when no
+  # workload carries a reloader.stakater.com annotation.
+  - name: reloader
+    version: 2.2.14
+    repository: https://stakater.github.io/stakater-charts
+    condition: reloader.enabled

@@ -17,6 +17,13 @@ spec:
         app.kubernetes.io/name: redis
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: cache
+      {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+      annotations:
+        # Stakater Reloader restarts the pod when cert-manager renews the mounted
+        # <release>-redis-tls Secret, so Redis serves the renewed leaf (Redis
+        # loads TLS material at startup only — no hot-reload).
+        reloader.stakater.com/auto: "true"
+      {{- end }}
     spec:
       {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
       # fsGroup = redis (999) so the server reads the cert-manager-mounted

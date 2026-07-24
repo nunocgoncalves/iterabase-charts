@@ -6,3 +6,8 @@
 global:
   internalTLS:
     enabled: true
+
+# Reloader restarts the TLS-serving workloads when cert-manager renews their
+# mounted cert Secrets (see charts/iterabase-platform/values.yaml).
+reloader:
+  enabled: true

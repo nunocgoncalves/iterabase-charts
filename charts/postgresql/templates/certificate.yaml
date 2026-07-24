@@ -3,8 +3,12 @@
 {{- $ns := .Release.Namespace }}
 # Server leaf cert for Postgres TLS. SANs cover the Service DNS names clients
 # connect with (sslmode=verify-full checks the hostname). Issued by the internal
-# CA ClusterIssuer; cert-manager rotates it (90d). A post-install hook so it is
-# created after cert-manager + the internal CA are Ready.
+# CA ClusterIssuer; cert-manager renews the mounted Secret (90d, renewBefore 15d).
+# Pre-install/pre-upgrade hook (weight after the CA) so the Certificate exists
+# before the StatefulSet pods start — see charts/cert-issuers for the ordering
+# rationale. PostgreSQL reads ssl_cert_file/ssl_key_file at startup (and on
+# SIGHUP); a renewed Secret does NOT auto-reload the server — see
+# docs/internal-tls-rotation.md.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -12,7 +16,7 @@ metadata:
   labels:
     {{- include "postgresql.labels" . | nindent 4 }}
   annotations:
-    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook: pre-install,pre-upgrade
     helm.sh/hook-weight: "20"
 spec:
   secretName: {{ $name }}-tls

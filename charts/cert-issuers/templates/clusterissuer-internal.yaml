@@ -11,10 +11,14 @@ kind: ClusterIssuer
 metadata:
   name: {{ $bootstrap | quote }}
   annotations:
-    # cert-manager's CRD + validating webhook must be established before this CR
-    # can be created, so apply it as a post-install/post-upgrade hook (after
-    # `helm --wait` confirms cert-manager is Ready).
-    helm.sh/hook: post-install,post-upgrade
+    # Pre-install/pre-upgrade hook so the CA exists BEFORE the TLS workloads are
+    # created. The workloads mount leaf Secrets that cert-manager issues from
+    # this CA, and `helm upgrade --install --wait` blocks on those pods being
+    # Ready. A post-install hook would deadlock: the pods wait on Secrets that
+    # are only created after `--wait` succeeds. cert-manager (CRDs + controller)
+    # is a pre-existing cluster prerequisite; this hook only orders CA creation
+    # ahead of the workloads so issuance can proceed in parallel with startup.
+    helm.sh/hook: pre-install,pre-upgrade
     helm.sh/hook-weight: "10"
   labels:
     {{- include "cert-issuers.labels" . | nindent 4 }}
@@ -29,7 +33,7 @@ kind: Certificate
 metadata:
   name: {{ $caSecret | quote }}
   annotations:
-    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook: pre-install,pre-upgrade
     helm.sh/hook-weight: "11"
   labels:
     {{- include "cert-issuers.labels" . | nindent 4 }}
@@ -49,7 +53,7 @@ kind: ClusterIssuer
 metadata:
   name: {{ .Values.internal.ca.name | quote }}
   annotations:
-    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook: pre-install,pre-upgrade
     helm.sh/hook-weight: "12"
   labels:
     {{- include "cert-issuers.labels" . | nindent 4 }}

@@ -3,7 +3,10 @@
 {{- $ns := .Release.Namespace }}
 # Server leaf cert for Redis TLS. SANs cover the Service DNS names clients
 # connect with (rediss:// + RootCAs verifies the hostname). Issued by the
-# internal CA; cert-manager rotates it (90d). Post-install hook (after the CA).
+# internal CA; cert-manager renews the mounted Secret (90d, renewBefore 15d).
+# Pre-install/pre-upgrade hook (weight after the CA) so the Certificate exists
+# before the Deployment starts. Redis loads TLS material at startup only — a
+# renewed Secret needs a restart to take effect; see docs/internal-tls-rotation.md.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -11,7 +14,7 @@ metadata:
   labels:
     {{- include "redis.labels" . | nindent 4 }}
   annotations:
-    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook: pre-install,pre-upgrade
     helm.sh/hook-weight: "20"
 spec:
   secretName: {{ $name }}-tls

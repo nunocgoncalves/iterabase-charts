@@ -25,6 +25,7 @@ jobs:
           helm repo add metallb https://metallb.github.io/metallb
           helm repo add jetstack https://charts.jetstack.io
           helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo add stakater https://stakater.github.io/stakater-charts
       - name: check (lint + template + kubeconform)
         run: make check
       - name: check-tls (static render + kubeconform with internal TLS on)
@@ -44,6 +45,7 @@ jobs:
           helm repo add metallb https://metallb.github.io/metallb
           helm repo add jetstack https://charts.jetstack.io
           helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo add stakater https://stakater.github.io/stakater-charts
       - name: build deps (control-plane's nested postgresql first, then the umbrella)
         run: |
           helm dependency build charts/control-plane

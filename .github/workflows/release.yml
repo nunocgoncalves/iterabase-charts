@@ -30,6 +30,7 @@ jobs:
           helm repo add metallb https://metallb.github.io/metallb
           helm repo add jetstack https://charts.jetstack.io
           helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo add stakater https://stakater.github.io/stakater-charts
       - name: resolve chart + version from tag
         id: tag
         run: |

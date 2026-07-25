@@ -122,7 +122,6 @@ spec:
     subresources:
       status: {}
 ---
----
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -580,10 +579,10 @@ spec:
                 type: array
               volumeMounts:
                 description: |-
-                  volumeMounts are extra container volume mounts, appended after the
-                  controller-managed hf-cache and dshm mounts. Reserved mount names
-                  `hf-cache` and `dshm` may not be reused. Pair with volumes to overlay
-                  file artifacts onto the serving image. Ignored for external.
+                  volumeMounts are user-provided container volume mounts; the controller
+                  appends its managed hf-cache and dshm mounts after these. Reserved
+                  mount names `hf-cache` and `dshm` may not be reused. Pair with volumes
+                  to overlay file artifacts onto the serving image. Ignored for external.
                 items:
                   description: VolumeMount describes a mounting of a Volume within
                     a container.
@@ -648,12 +647,13 @@ spec:
                 type: array
               volumes:
                 description: |-
-                  volumes are extra pod volumes, appended after the controller-managed
-                  hf-cache (hostPath /data/hf-cache) and dshm (memory emptyDir /dev/shm)
-                  volumes. The reserved names `hf-cache` and `dshm` may not be reused —
-                  the reconciler rejects a CR that declares either. Use this for custom
-                  vLLM builds that need file-artifact overlays (e.g. a ConfigMap of patch
-                  .py files subPath-mounted over venv paths) or a PV. Ignored for external.
+                  volumes are user-provided pod volumes; the controller appends its
+                  managed hf-cache (hostPath /data/hf-cache) and dshm (memory emptyDir
+                  /dev/shm) volumes after these. The reserved names `hf-cache` and
+                  `dshm` may not be reused — the reconciler rejects a CR that declares
+                  either. Use this for custom vLLM builds that need file-artifact
+                  overlays (e.g. a ConfigMap of patch .py files subPath-mounted over
+                  venv paths) or a PV. Ignored for external.
                 items:
                   description: Volume represents a named volume in a pod that may
                     be accessed by any container in the pod.

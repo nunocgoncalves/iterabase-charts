@@ -10,6 +10,7 @@ metadata:
   labels:
     {{- include "minio.labels" . | nindent 4 }}
 spec:
+  jobLabel: app.kubernetes.io/name
   selector:
     matchLabels:
       app.kubernetes.io/name: minio

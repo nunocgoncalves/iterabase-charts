@@ -158,3 +158,98 @@ jobs:
           kubectl get ingress -n iterabase-system -o wide || true
           kubectl describe ingress -n iterabase-system || true
           exit 1
+
+  install-observability:
+    # Installs the umbrella on kind WITH the observability preset
+    # (values-observability.yaml) so the Prometheus/Grafana/Loki/Alertmanager
+    # stack + Promtail + every component's exporter come up. kind's local-path
+    # StorageClass backs the stack PVs. --wait fails the job if any directly-
+    # managed pod CrashLoops (catches exporter flag/config regressions like the
+    # postgres DSN / redis TLS / promtail Loki-URL fixes). PV-restart-
+    # persistence and full scrape evidence (control-plane/gateway /metrics) are
+    # tracked on HOR-408 (the latter is blocked on the service-repo /metrics
+    # endpoints).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+      - uses: helm/kind-action@v1
+        with:
+          version: v0.24.0
+      - name: helm repo add external chart repositories
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add metallb https://metallb.github.io/metallb
+          helm repo add jetstack https://charts.jetstack.io
+          helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo add stakater https://stakater.github.io/stakater-charts
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+      - name: build deps (control-plane + observability nested deps, then umbrella)
+        run: |
+          helm dependency build charts/control-plane
+          helm dependency build charts/observability
+          helm dependency build charts/iterabase-platform
+      - name: compute MetalLB pool from the kind docker-bridge subnet
+        run: |
+          subnets=$(docker network inspect kind -f '{{range .IPAM.Config}}{{.Subnet}}{{"\n"}}{{end}}')
+          echo "kind subnets: $subnets"
+          subnet=$(echo "$subnets" | grep -E '^[0-9]+\.' | head -1)
+          if [ -z "$subnet" ]; then
+            echo "::error::kind network has no IPv4 subnet ($(echo "$subnets" | tr '\n' ' '))"
+            exit 1
+          fi
+          base=$(echo "$subnet" | cut -d. -f1-2)
+          echo "using IPv4 subnet $subnet -> pool base $base"
+          cat > /tmp/kind-edge.yaml <<EOF
+          metallb:
+            enabled: true
+          metallb-config:
+            enabled: true
+            addresses:
+              - ${base}.255.200-${base}.255.250
+          EOF
+          cat /tmp/kind-edge.yaml
+      - name: install umbrella with the observability stack + edge (kind)
+        run: |
+          # Public edge (ingress-nginx LB + cert-manager TLS, as in the
+          # `install` job) PLUS the observability preset so the full stack +
+          # Promtail + every component's metrics/exporter render and start.
+          helm install iterabase charts/iterabase-platform \
+            --create-namespace -n iterabase-system \
+            -f /tmp/kind-edge.yaml \
+            -f values-observability.yaml \
+            --set external-dns.enabled=false \
+            --wait --timeout 15m
+      - name: assert the four stack components + promtail + exporters are ready
+        run: |
+          set -e
+          ns=iterabase-system
+          # Wait for pods matching a label to exist, then to be Ready. The
+          # Prometheus Operator creates the Prometheus StatefulSet asynchronously
+          # (after the operator is Ready), so the pod may not exist right after
+          # --wait; the existence loop absorbs that lag.
+          wait_pods() {
+            local label="$1"
+            echo "waiting for pods: $label"
+            for i in $(seq 1 60); do
+              if [ -n "$(kubectl get pods -n "$ns" -l "$label" -o name 2>/dev/null)" ]; then
+                kubectl wait --for=condition=Ready pod -n "$ns" -l "$label" --timeout=300s && return 0
+              fi
+              sleep 5
+            done
+            echo "::error::pods for $label never appeared"
+            kubectl get pods -n "$ns" -l "$label" -o wide || true
+            return 1
+          }
+          wait_pods "app.kubernetes.io/name=prometheus"
+          wait_pods "app.kubernetes.io/name=grafana"
+          wait_pods "app.kubernetes.io/name=loki,app.kubernetes.io/component=single-binary"
+          wait_pods "app.kubernetes.io/name=alertmanager"
+          wait_pods "app.kubernetes.io/name=promtail"
+          wait_pods "app.kubernetes.io/name=postgresql,app.kubernetes.io/component=exporter"
+          wait_pods "app.kubernetes.io/name=redis,app.kubernetes.io/component=exporter"
+          echo "all observability targets ready"
+          kubectl get pods -n "$ns" -o wide | grep -E "prometheus|grafana|loki|alertmanager|promtail|exporter" || true
+      - name: helm test (runs the chart's helm tests)
+        run: helm test iterabase -n iterabase-system --timeout 5m

@@ -23,3 +23,12 @@ dependencies:
     version: 7.1.0
     repository: https://grafana.github.io/helm-charts
     condition: loki.enabled
+  # Promtail: DaemonSet that tails every node's container logs and pushes them
+  # to the in-chart Loki, so platform workload logs are collected, stored, and
+  # queryable in Grafana (HOR-408 outcome). The client URL is Helm-templated by
+  # the chart (tpl'd config.clients) so it resolves to the release-scoped Loki
+  # SingleBinary service in any install.
+  - name: promtail
+    version: 6.16.6
+    repository: https://grafana.github.io/helm-charts
+    condition: promtail.enabled

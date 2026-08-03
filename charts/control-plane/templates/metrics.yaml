@@ -16,6 +16,7 @@ metadata:
     {{- include "control-plane.labels" . | nindent 4 }}
     app.kubernetes.io/component: api
 spec:
+  jobLabel: app.kubernetes.io/name
   selector:
     matchLabels:
       app.kubernetes.io/name: control-plane
@@ -48,6 +49,7 @@ metadata:
     {{- include "control-plane.labels" . | nindent 4 }}
     app.kubernetes.io/component: manager
 spec:
+  jobLabel: app.kubernetes.io/name
   selector:
     matchLabels:
       app.kubernetes.io/name: control-plane
@@ -73,6 +75,7 @@ metadata:
     {{- include "control-plane.labels" . | nindent 4 }}
     app.kubernetes.io/component: model-backend
 spec:
+  jobLabel: app.kubernetes.io/name
   namespaceSelector:
     {{- toYaml .Values.metrics.vllm.namespaceSelector | nindent 4 }}
   selector:

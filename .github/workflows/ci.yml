@@ -253,3 +253,45 @@ jobs:
           kubectl get pods -n "$ns" -o wide | grep -E "prometheus|grafana|loki|alertmanager|promtail|exporter" || true
       - name: helm test (runs the chart's helm tests)
         run: helm test iterabase -n iterabase-system --timeout 5m
+      - name: assert Prometheus PV-backed data persists across pod restart
+        run: |
+          set -e
+          ns=iterabase-system
+          prom_svc=iterabase-kube-prometheus-prometheus
+          # Query Prometheus for up{job="postgresql"} (the postgres exporter is
+          # up) and return the series count; 0 = not scraped / not queryable yet.
+          wait_query() {
+            for i in $(seq 1 30); do
+              n=$(curl -fsS -G "http://localhost:9090/api/v1/query" --data-urlencode 'query=up{job="postgresql"}' \
+                | python3 -c 'import sys,json;d=json.load(sys.stdin);print(len(d["data"]["result"]))' 2>/dev/null || echo 0)
+              [ "$n" -gt 0 ] && { echo "$n"; return 0; }
+              sleep 5
+            done
+            echo 0
+          }
+          kubectl port-forward -n "$ns" svc/$prom_svc 9090:9090 >/dev/null 2>&1 &
+          pf=$!
+          sleep 5
+          echo "waiting for Prometheus to scrape the postgres exporter..."
+          n=$(wait_query)
+          echo "pre-restart up{job=postgresql} series: $n"
+          [ "$n" -gt 0 ] || { echo "::error::Prometheus never scraped postgresql before restart"; kill $pf 2>/dev/null || true; exit 1; }
+          kill $pf 2>/dev/null || true; sleep 1
+          # Restart the Prometheus pod (operator-managed StatefulSet reattaches its
+          # volumeClaimTemplate PVC); the TSDB on the PV must survive.
+          prom_pod=$(kubectl get pods -n "$ns" -l app.kubernetes.io/name=prometheus -o jsonpath='{.items[0].metadata.name}')
+          echo "restarting Prometheus pod $prom_pod (PV must persist the TSDB)..."
+          kubectl delete pod -n "$ns" "$prom_pod" --wait
+          for i in $(seq 1 60); do
+            [ -n "$(kubectl get pods -n "$ns" -l app.kubernetes.io/name=prometheus -o name 2>/dev/null)" ] && break
+            sleep 2
+          done
+          kubectl wait --for=condition=Ready pod -n "$ns" -l app.kubernetes.io/name=prometheus --timeout=300s
+          kubectl port-forward -n "$ns" svc/$prom_svc 9090:9090 >/dev/null 2>&1 &
+          pf=$!
+          sleep 5
+          n2=$(wait_query)
+          echo "post-restart up{job=postgresql} series: $n2"
+          kill $pf 2>/dev/null || true
+          [ "$n2" -gt 0 ] || { echo "::error::Prometheus TSDB data did not persist across pod restart (PV not retained)"; exit 1; }
+          echo "Prometheus PV-backed data persisted across pod restart"

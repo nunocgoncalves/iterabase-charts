@@ -45,9 +45,13 @@ jobs:
         env:
           CHART: ${{ steps.tag.outputs.chart }}
         run: |
-          # control-plane has its own file:// dep (postgresql); build it first so
-          # the umbrella vendors control-plane with nested deps baked in.
+          # control-plane and observability each carry their own nested deps
+          # (postgresql; kube-prometheus-stack + loki). Build them first so the
+          # umbrella vendors each subchart with nested deps baked in (matches
+          # `make build-deps`); otherwise an observability-enabled umbrella
+          # packages without the upstream archives.
           helm dependency build charts/control-plane
+          helm dependency build charts/observability
           helm dependency build "charts/$CHART"
       - name: package + push
         env:

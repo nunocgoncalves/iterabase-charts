@@ -112,6 +112,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/component: exporter
 spec:
+  jobLabel: app.kubernetes.io/name
   selector:
     matchLabels:
       app.kubernetes.io/name: postgresql

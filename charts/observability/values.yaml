@@ -117,6 +117,30 @@ loki:
       enabled: true
       size: 10Gi
       # storageClassName: set in the overlay for prod
+  # SingleBinary + filesystem storage does not need the external memcached
+  # chunks/results caches (they add 2+ memcached pods the kind install does not
+  # need); disable them. An overlay switching to object storage / SimpleScalable
+  # may re-enable them.
+  chunksCache:
+    enabled: false
+  resultsCache:
+    enabled: false
+
+# --- Promtail (pod log collection -> Loki) ---
+# DaemonSet that tails every node's container logs (kubernetes_sd role=pod +
+# the cri pipeline stage for containerd/kind) and pushes them to the in-chart
+# Loki SingleBinary service, so control-plane, inference-gateway, vLLM, and
+# dependency logs are collected, stored, and queryable in Grafana (HOR-408
+# outcome: "logs are collected, stored, and routed"). The client URL is
+# Helm-templated (the promtail chart tpl's config.clients) so it resolves to the
+# release-scoped Loki service name in any install (umbrella release
+# `iterabase-platform-loki`, kind CI release `iterabase-loki`, etc.). RBAC +
+# ServiceAccount + the pod-discovery scrape config are the chart defaults.
+promtail:
+  enabled: true
+  config:
+    clients:
+      - url: http://{{ .Release.Name }}-loki:3100/loki/api/v1/push
 
 # --- NVIDIA DCGM (GPU metrics) scraping ---
 # gpu-operator (deployed out-of-band as infra on GPU nodes) runs dcgm-exporter as

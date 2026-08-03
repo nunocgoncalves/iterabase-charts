@@ -26,11 +26,16 @@ inference-gateway:
 control-plane:
   metrics:
     enabled: true
-    # vLLM / model-backend pods are operator-created; the scrape target depends
-    # on the operator's pod template. Off by default — match the operator's
-    # labels/port here (or via a service-repo ticket) to enable.
+    # vLLM / model-backend pods are operator-created over the ModelBackend CRD;
+    # vLLM exposes /metrics natively on its API port. The control-plane chart
+    # ships a default selector (part-of=iterabase-platform, component=model-
+    # backend) + port (http) matching the operator's pod template. Enabled here
+    # so the PodMonitor renders; confirmed scraping requires a live vLLM deploy
+    # (OPO1) — no model-backend pods exist in kind, so the monitor simply has
+    # no targets there. Override the selector/port in the OPO1 overlay if the
+    # operator's pod template differs.
     vllm:
-      enabled: false
+      enabled: true
   # postgresql is a subchart of control-plane; its exporter is nested here.
   postgresql:
     metrics:

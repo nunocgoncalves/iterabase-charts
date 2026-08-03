@@ -295,3 +295,105 @@ jobs:
           kill $pf 2>/dev/null || true
           [ "$n2" -gt 0 ] || { echo "::error::Prometheus TSDB data did not persist across pod restart (PV not retained)"; exit 1; }
           echo "Prometheus PV-backed data persisted across pod restart"
+
+  install-observability-tls:
+    # Combined TLS + observability runtime check (HOR-408 / F6): installs the
+    # umbrella on kind with internalTLS ON (values-tls.yaml) AND the observability
+    # stack (values-observability.yaml), then asserts the four stack components
+    # actually serve HTTPS (TLS handshake succeeds) — proving the chart-rendered
+    # leaf Certificates + the upstream charts' TLS-serving config wire up. This
+    # is the safety net that makes the stack-component TLS maintainable: a chart
+    # bump that breaks the TLS wiring fails here.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+      - uses: helm/kind-action@v1
+        with:
+          version: v0.24.0
+      - name: helm repo add external chart repositories
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add metallb https://metallb.github.io/metallb
+          helm repo add jetstack https://charts.jetstack.io
+          helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo add stakater https://stakater.github.io/stakater-charts
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+      - name: build deps (control-plane + observability nested deps, then umbrella)
+        run: |
+          helm dependency build charts/control-plane
+          helm dependency build charts/observability
+          helm dependency build charts/iterabase-platform
+      - name: compute MetalLB pool from the kind docker-bridge subnet
+        run: |
+          subnets=$(docker network inspect kind -f '{{range .IPAM.Config}}{{.Subnet}}{{"\n"}}{{end}}')
+          subnet=$(echo "$subnets" | grep -E '^[0-9]+\.' | head -1)
+          base=$(echo "$subnet" | cut -d. -f1-2)
+          cat > /tmp/kind-edge.yaml <<EOF
+          metallb:
+            enabled: true
+          metallb-config:
+            enabled: true
+            addresses:
+              - ${base}.255.200-${base}.255.250
+          EOF
+      - name: install umbrella with observability + internalTLS (kind)
+        run: |
+          # global.internalTLS on (values-tls.yaml) + the observability stack
+          # (values-observability.yaml). --wait fails if any TLS-serving pod
+          # CrashLoops (bad cert mount / TLS config).
+          helm install iterabase charts/iterabase-platform \
+            --create-namespace -n iterabase-system \
+            -f /tmp/kind-edge.yaml \
+            -f values-observability.yaml \
+            -f values-tls.yaml \
+            --set external-dns.enabled=false \
+            --wait --timeout 15m
+      - name: assert the four stack components serve HTTPS (TLS handshake)
+        run: |
+          set -e
+          ns=iterabase-system
+          # Wait for cert-manager to issue the 4 stack leaf certs (chart-rendered
+          # Certificates, pre-install hooks off the internal CA).
+          for s in observability-prometheus-tls observability-alertmanager-tls observability-grafana-tls observability-loki-tls; do
+            echo "waiting for cert Secret $s ..."
+            for i in $(seq 1 90); do
+              [ -n "$(kubectl get secret -n "$ns" "$s" -o jsonpath='{.data.tls\.crt}' 2>/dev/null)" ] && break
+              sleep 2
+            done
+            [ -n "$(kubectl get secret -n "$ns" "$s" -o jsonpath='{.data.tls\.crt}' 2>/dev/null)" ] || { echo "::error::cert $s not issued"; exit 1; }
+          done
+          # Wait for the stack pods to be Ready.
+          wait_pods() {
+            local label="$1"
+            for i in $(seq 1 60); do
+              [ -n "$(kubectl get pods -n "$ns" -l "$label" -o name 2>/dev/null)" ] && { kubectl wait --for=condition=Ready pod -n "$ns" -l "$label" --timeout=300s && return 0; }
+              sleep 5
+            done
+            echo "::error::pods $label never appeared"; return 1
+          }
+          wait_pods "app.kubernetes.io/name=prometheus"
+          wait_pods "app.kubernetes.io/name=alertmanager"
+          wait_pods "app.kubernetes.io/name=grafana"
+          wait_pods "app.kubernetes.io/name=loki,app.kubernetes.io/component=single-binary"
+          # Assert HTTPS: port-forward each Service, curl -k (skip CA verify; the
+          # internal CA is self-signed) — a successful response means the TLS
+          # handshake completed (the component is serving HTTPS, not plaintext).
+          assert_https() {
+            local svc="$1" port="$2" path="$3"
+            kubectl port-forward -n "$ns" "svc/$svc" "${port}:${port}" >/dev/null 2>&1 &
+            local pf=$!
+            sleep 3
+            if curl -fsS -k "https://localhost:${port}${path}" >/dev/null 2>&1; then
+              echo "  OK  https://$svc:$port$path"
+              kill $pf 2>/dev/null || true; return 0
+            fi
+            echo "  FAIL https://$svc:$port$path (TLS handshake did not succeed)"
+            kill $pf 2>/dev/null || true; return 1
+          }
+          assert_https iterabase-kube-prometheus-prometheus 9090 /-/healthy
+          assert_https iterabase-kube-prometheus-alertmanager 9093 /-/healthy
+          assert_https iterabase-grafana 80 /api/health
+          assert_https iterabase-loki 3100 /ready
+          echo "all four observability stack components serve HTTPS over internal TLS"

@@ -1,5 +1,12 @@
 enabled: true
 
+# Internal TLS: when global.internalTLS is on, the chart renders stack-
+# component leaf Certificates (stack-internal-tls.yaml) signed by this issuer
+# (the cert-issuers internal CA ClusterIssuer), and values-tls.yaml configures
+# the upstream charts to serve HTTPS + the Grafana datasources switch to https.
+tls:
+  issuerName: internal-ca
+
 # --- Prometheus / Grafana / Alertmanager (kube-prometheus-stack) ---
 # The stack is configured here as the platform default: PV-backed Prometheus +
 # Alertmanager + Grafana, the operator's CRDs, node-exporter + kube-state-metrics

@@ -27,7 +27,8 @@ kube-prometheus-stack:
       storage:
         volumeClaimTemplate:
           spec:
-            storageClassName: null # null = cluster default StorageClass; override in the overlay
+            # storageClassName omitted => cluster default StorageClass; set in
+            # the overlay for prod (the Prometheus Operator CRD rejects null).
             accessModes: ["ReadWriteOnce"]
             resources:
               requests:
@@ -59,7 +60,9 @@ kube-prometheus-stack:
     prometheusSpec:
       replicas: 1
       retention: 15d
-      retentionSize: 90%
+      # retentionSize is an absolute byte cap (the Prometheus Operator CRD
+      # requires a byte-size value, not a percentage); 18GB ~ 90% of the 20Gi PV.
+      retentionSize: 18GB
       # Nil selectors => Prometheus selects every ServiceMonitor / PodMonitor /
       # PrometheusRule in the cluster, so per-component monitors (owned by the
       # other iterabase subcharts) and the upstream charts' native monitors are
@@ -70,7 +73,8 @@ kube-prometheus-stack:
       storageSpec:
         volumeClaimTemplate:
           spec:
-            storageClassName: null # null = cluster default StorageClass; override in the overlay
+            # storageClassName omitted => cluster default StorageClass; set in
+            # the overlay for prod (the Prometheus Operator CRD rejects null).
             accessModes: ["ReadWriteOnce"]
             resources:
               requests:

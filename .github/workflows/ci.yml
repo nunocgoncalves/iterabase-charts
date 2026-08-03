@@ -402,19 +402,19 @@ jobs:
           # internal CA is self-signed) — a successful response means the TLS
           # handshake completed (the component is serving HTTPS, not plaintext).
           assert_https() {
-            local svc="$1" port="$2" path="$3"
-            kubectl port-forward -n "$ns" "svc/$svc" "${port}:${port}" >/dev/null 2>&1 &
+            local svc="$1" localport="$2" port="$3" path="$4"
+            kubectl port-forward -n "$ns" "svc/$svc" "${localport}:${port}" >/dev/null 2>&1 &
             local pf=$!
             sleep 3
-            if curl -fsS -k "https://localhost:${port}${path}" >/dev/null 2>&1; then
+            if curl -fsS -k "https://localhost:${localport}${path}" >/dev/null 2>&1; then
               echo "  OK  https://$svc:$port$path"
               kill $pf 2>/dev/null || true; return 0
             fi
             echo "  FAIL https://$svc:$port$path (TLS handshake did not succeed)"
             kill $pf 2>/dev/null || true; return 1
           }
-          assert_https iterabase-kube-prometheus-prometheus 9090 /-/healthy
-          assert_https iterabase-kube-prometheus-alertmanager 9093 /-/healthy
-          assert_https iterabase-grafana 80 /api/health
-          assert_https iterabase-loki 3100 /ready
+          assert_https iterabase-kube-prometheus-prometheus 9090 9090 /-/healthy
+          assert_https iterabase-kube-prometheus-alertmanager 9093 9093 /-/healthy
+          assert_https iterabase-grafana 3000 80 /api/health
+          assert_https iterabase-loki 3100 3100 /ready
           echo "all four observability stack components serve HTTPS over internal TLS"

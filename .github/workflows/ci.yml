@@ -313,21 +313,32 @@ jobs:
           kubectl port-forward -n "$ns" svc/iterabase-loki 3100:3100 >/dev/null 2>&1 &
           pf=$!
           sleep 5
+          # Confirm Loki is queryable before polling.
+          curl -fsS "http://localhost:3100/ready" >/dev/null 2>&1 || { echo "::error::Loki /ready failed"; kill $pf 2>/dev/null || true; exit 1; }
+          query_marker() {
+            # Returns the raw Loki query_range response. Uses the stream selector
+            # {pod="$emitter"} (promtail's default relabel sets `pod`) plus a
+            # line filter on the marker. start/end in ns cover the last 10 min.
+            curl -sS -G "http://localhost:3100/loki/api/v1/query_range" \
+              --data-urlencode "query={pod=\"$emitter\"} |= \"$marker\"" \
+              --data-urlencode "start=$(($(date +%s)-600))000000000" \
+              --data-urlencode "end=$(($(date +%s)+60))000000000" \
+              --data-urlencode "direction=forward" \
+              --data-urlencode "limit=20" 2>&1 || true
+          }
           wait_marker() {
             for i in $(seq 1 40); do
-              if curl -fsS -G "http://localhost:3100/loki/api/v1/query_range" \
-                  --data-urlencode 'query={pod="'$emitter'"} |= "'$marker'"' \
-                  --data-urlencode "start=$(($(date +%s)-600))000000000" \
-                  --data-urlencode "end=$(($(date +%s)+60))000000000" \
-                  --data-urlencode "limit=5" 2>/dev/null | grep -q "$marker"; then
-                echo found; return 0
-              fi
+              resp=$(query_marker)
+              if echo "$resp" | grep -q "$marker"; then echo found; return 0; fi
               sleep 5
             done
+            echo "::warning::Loki labels:"; curl -sS "http://localhost:3100/loki/api/v1/labels" 2>&1 | head -c 800; echo
+            echo "::warning::Loki {namespace=iterabase-system} sample:"; curl -sS -G "http://localhost:3100/loki/api/v1/query_range" --data-urlencode 'query={namespace="iterabase-system"}' --data-urlencode "start=$(($(date +%s)-600))000000000" --data-urlencode "end=$(($(date +%s)+60))000000000" --data-urlencode "limit=3" 2>&1 | head -c 800; echo
+            echo "::warning::marker query response:"; echo "$resp" | head -c 800; echo
             echo notfound
           }
           echo "waiting for promtail to ingest the marker log into Loki..."
-          [ "$(wait_marker)" = found ] || { echo "::error::marker log not ingested into Loki (promtail → Loki broken)"; kubectl logs -n "$ns" -l app.kubernetes.io/name=promtail --tail=20 2>/dev/null || true; kill $pf 2>/dev/null || true; exit 1; }
+          [ "$(wait_marker)" = found ] || { echo "::error::marker log not ingested into Loki (promtail → Loki broken)"; kubectl logs -n "$ns" -l app.kubernetes.io/name=promtail --tail=30 2>/dev/null || true; kill $pf 2>/dev/null || true; exit 1; }
           echo "promtail → Loki log ingestion OK"
           # Restart the Loki SingleBinary pod; the filesystem PVC must persist
           # the TSDB index + chunks so the marker is still queryable (HOR-408

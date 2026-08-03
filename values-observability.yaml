@@ -27,13 +27,12 @@ control-plane:
   metrics:
     enabled: true
     # vLLM / model-backend pods are operator-created over the ModelBackend CRD;
-    # vLLM exposes /metrics natively on its API port. The control-plane chart
-    # ships a default selector (part-of=iterabase-platform, component=model-
-    # backend) + port (http) matching the operator's pod template. Enabled here
-    # so the PodMonitor renders; confirmed scraping requires a live vLLM deploy
-    # (OPO1) — no model-backend pods exist in kind, so the monitor simply has
-    # no targets there. Override the selector/port in the OPO1 overlay if the
-    # operator's pod template differs.
+    # vLLM exposes /metrics natively on its serving port (http). The control-
+    # plane chart's default selector matches any model-backend pod by the
+    # `platform.iterabase.com/modelbackend` label (presence; the instance name is
+    # dynamic) — the actual labels set by the operator's backendLabels(). Enabled
+    # here so the PodMonitor renders; in kind there are no model-backend pods so
+    # the monitor has no targets. The OPO1 overlay enables it for live scraping.
     vllm:
       enabled: true
   # postgresql is a subchart of control-plane; its exporter is nested here.

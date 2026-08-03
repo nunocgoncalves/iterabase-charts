@@ -97,12 +97,14 @@ metrics:
   manager:
     port: http-metrics
   # vLLM / model-backend pods (managed by this chart's operator over the
-  # modelbackends CRD). vLLM exposes /metrics natively on its API port, but the
-  # pods are operator-created, so the scrape target (labels + port) depends on
-  # the operator's pod template. Disabled even when metrics.enabled — opt in and
-  # match the operator's labels/port in the overlay (or a service-repo ticket to
-  # standardize them). Defaults assume a part-of=iterabase-platform,
-  # component=model-backend label and an http port.
+  # modelbackends CRD). vLLM exposes /metrics natively on its serving port. The
+  # pods are operator-created with the label
+  # `platform.iterabase.com/modelbackend=<instance>` (see backendLabels() in the
+  # control-plane service repo) and a container port named `http` (default 8000);
+  # the selector below matches any model-backend pod by label existence (the
+  # instance name is dynamic). Disabled even when metrics.enabled — opt in here
+  # or (for prod) in the overlay. namespaceSelector:any so it discovers pods
+  # wherever the operator places them.
   vllm:
     enabled: false
     port: http
@@ -110,6 +112,6 @@ metrics:
     namespaceSelector:
       any: true
     selector:
-      matchLabels:
-        app.kubernetes.io/part-of: iterabase-platform
-        app.kubernetes.io/component: model-backend
+      matchExpressions:
+        - key: platform.iterabase.com/modelbackend
+          operator: Exists

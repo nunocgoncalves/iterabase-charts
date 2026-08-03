@@ -58,11 +58,16 @@ ingress-nginx:
         enabled: true
 
 metallb:
+  # metallb's ServiceMonitor creates a RoleBinding that requires the release-
+  # scoped Prometheus ServiceAccount + namespace
+  # (prometheus.serviceAccount / prometheus.namespace), which this static preset
+  # cannot know. metallb metrics scraping is therefore overlay-owned (the prod
+  # overlay sets both with the install release name/namespace). metallb itself
+  # is enabled by the kind-edge / prod overlay; without the ServiceMonitor its
+  # metrics Service is simply unscraped here.
   prometheus:
     serviceMonitor:
-      enabled: true
-  # metallb itself must be enabled (kind preset / prod overlay) for its metrics
-  # Service to exist; the ServiceMonitor is harmless without it.
+      enabled: false
 
 cert-manager:
   prometheus:

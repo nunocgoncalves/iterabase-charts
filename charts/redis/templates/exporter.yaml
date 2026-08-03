@@ -1,7 +1,7 @@
 {{- if .Values.enabled }}
 {{- if .Values.metrics.enabled }}
 {{- $tls := (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
-{{- $auth := (or .Values.auth.enabled $tls) }}
+{{- $auth := .Values.auth.enabled }}
 {{- $caSecret := (printf "%s-internal-ca-root" .Release.Name) }}
 {{- $name := (printf "%s-redis-exporter" .Release.Name) }}
 # redis-exporter: standalone Deployment + Service + ServiceMonitor. Separate pod
@@ -32,24 +32,14 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: exporter
     spec:
-      {{- if or $tls $auth }}
+      {{- if $tls }}
       volumes:
-        {{- if $tls }}
         - name: internal-ca
           secret:
             secretName: {{ $caSecret }}
             items:
               - key: ca.crt
                 path: ca.crt
-        {{- end }}
-        {{- if $auth }}
-        - name: redis-secret
-          secret:
-            secretName: {{ include "redis.secretName" . }}
-            items:
-              - key: redis-password
-                path: redis-password
-        {{- end }}
       {{- end }}
       containers:
         - name: redis-exporter
@@ -58,29 +48,35 @@ spec:
           # redis_exporter v1.67.0 has no --tls flag ("flag provided but not
           # defined: -tls" -> CrashLoop). Enable TLS via the rediss:// scheme on
           # --redis.addr and verify the server cert with --tls-ca-cert-file.
+          # --redis.password-file expects a JSON password array on v1.67.0 (not
+          # the raw Secret), so pass the runtime password via --redis.password with
+          # K8s $(VAR) arg expansion from the REDIS_PASSWORD env var (no shell —
+          # the image is distroless). TLS does not imply AUTH (redis auth is a
+          # separate knob) — the password is used only when auth.enabled.
           args:
             - --redis.addr={{ if $tls }}rediss://{{ end }}{{ include "redis.name" . }}:6379
-            {{- if $auth }}
-            - --redis.password-file=/etc/redis/secrets/redis-password
-            {{- end }}
             {{- if $tls }}
             - --tls-ca-cert-file={{ .Values.tls.caMountPath }}
             {{- end }}
+            {{- if $auth }}
+            - --redis.password=$(REDIS_PASSWORD)
+            {{- end }}
+          {{- if $auth }}
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "redis.secretName" . }}
+                  key: redis-password
+          {{- end }}
           ports:
             - name: http-metrics
               containerPort: 9121
-          {{- if or $tls $auth }}
+          {{- if $tls }}
           volumeMounts:
-            {{- if $tls }}
             - name: internal-ca
               mountPath: {{ dir .Values.tls.caMountPath }}
               readOnly: true
-            {{- end }}
-            {{- if $auth }}
-            - name: redis-secret
-              mountPath: /etc/redis/secrets
-              readOnly: true
-            {{- end }}
           {{- end }}
           {{- with .Values.metrics.resources }}
           resources:

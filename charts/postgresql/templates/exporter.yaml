@@ -57,12 +57,15 @@ spec:
           # the generated password is never templated into the chart. The DSN
           # user/db come from the chart's auth values (defaults: gateway/gateway;
           # the control-plane overrides to controlplane/controlplane).
+          # postgres-exporter v0.15.0 dropped the --data-source-name CLI flag
+          # ("unknown long flag" -> CrashLoop); it reads the DSN from the
+          # DATA_SOURCE_NAME env var instead.
           command:
             - sh
             - -c
             - |
-              exec postgres_exporter \
-                --data-source-name="postgresql://{{ .Values.auth.username }}:$(cat /etc/pg/password)@{{ include "postgresql.name" . }}:5432/{{ .Values.auth.database }}?sslmode={{ $sslmode }}{{ if $tls }}&sslrootcert={{ .Values.tls.caMountPath }}{{ end }}"
+              export DATA_SOURCE_NAME="postgresql://{{ .Values.auth.username }}:$(cat /etc/pg/password)@{{ include "postgresql.name" . }}:5432/{{ .Values.auth.database }}?sslmode={{ $sslmode }}{{ if $tls }}&sslrootcert={{ .Values.tls.caMountPath }}{{ end }}"
+              exec postgres_exporter
           ports:
             - name: http-metrics
               containerPort: 9187

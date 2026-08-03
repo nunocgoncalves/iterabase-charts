@@ -27,7 +27,7 @@ Whether internal TLS (global.internalTLS.enabled) is on. Use dig directly in
 `if` (NOT via include — include stringifies "false", which is truthy).
 */}}
 {{- define "observability.internalTLS" -}}
-{{- dig "global" "internalTLS" "enabled" false (.Values.global | default (dict)) -}}
+{{- dig "internalTLS" "enabled" false (.Values.global | default (dict)) -}}
 {{- end -}}
 
 {{/*
@@ -37,7 +37,7 @@ share the umbrella release name. When internalTLS is on, switch to https (the
 stack-component leaf certs' SANs cover these Service DNS names).
 */}}
 {{- define "observability.urlScheme" -}}
-{{- if (dig "global" "internalTLS" "enabled" false (.Values.global | default (dict))) }}https{{- else -}}http{{- end -}}
+{{- if (dig "internalTLS" "enabled" false (.Values.global | default (dict))) }}https{{- else -}}http{{- end -}}
 {{- end -}}
 
 {{- define "observability.prometheusURL" -}}

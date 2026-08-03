@@ -36,6 +36,17 @@ observability:
               key: tls.key
     alertmanager:
       alertmanagerSpec:
+        # Serve HTTPS (web.tlsConfig above) AND make Prometheus alert it over
+        # HTTPS. kps wires alertmanagerSpec.scheme/tlsConfig onto the Prometheus
+        # alerting endpoint (templates/prometheus/prometheus.yaml), so Prometheus
+        # talks TLS to Alertmanager instead of plaintext->HTTPS (which silently
+        # drops every alert when internalTLS is on). insecureSkipVerify because
+        # the internal CA is cert-manager-generated (mounting it into Prometheus
+        # for verification is a fast-follow); the connection is still TLS-
+        # encrypted in-cluster.
+        scheme: https
+        tlsConfig:
+          insecureSkipVerify: true
         web:
           tlsConfig:
             cert:
@@ -76,6 +87,19 @@ observability:
           path: /api/health
           port: grafana
           scheme: HTTPS
+  # Promtail pushes to Loki over HTTPS when internalTLS is on (Loki serves
+  # HTTPS via the leaf cert above). The default http:// client URL in the
+  # observability chart's values.yaml is overridden here with an https:// URL +
+  # tls_config (insecure_skip_verify: the internal CA is cert-manager-generated;
+  # the push is still TLS-encrypted). Without this, promtail->Loki is plaintext-
+  # >HTTPS and no workload logs reach Loki under TLS. Only applied with this TLS
+  # preset, so the plaintext kind path (values-observability.yaml) is untouched.
+  promtail:
+    config:
+      clients:
+        - url: https://{{ .Release.Name }}-loki:3100/loki/api/v1/push
+          tls_config:
+            insecure_skip_verify: true
   loki:
     # structuredConfig lives under the loki chart's nested `loki:` value
     # (.Values.loki.structuredConfig), so the path from the observability chart

@@ -11,3 +11,78 @@ global:
 # mounted cert Secrets (see charts/iterabase-platform/values.yaml).
 reloader:
   enabled: true
+
+# --- Observability stack: TLS serving (HOR-408 / F6) ---
+# Consumes global.internalTLS: the observability chart renders the stack-
+# component leaf Certificates (stack-internal-tls.yaml, signed by the internal
+# CA) when internalTLS is on; this preset points the upstream kube-prometheus-
+# stack/loki charts at those certs so Prometheus/Grafana/Loki/Alertmanager serve
+# HTTPS, and switches the Grafana datasources to https (the observability chart
+# renders https datasources when internalTLS is on; the kps default http://
+# datasources are disabled here because their scheme is hardcoded, not value-
+# overridable). Cert Secret names are FIXED (single-tenant, once-per-cluster).
+observability:
+  kube-prometheus-stack:
+    prometheus:
+      prometheusSpec:
+        web:
+          tlsConfig:
+            cert:
+              secret:
+                name: observability-prometheus-tls
+                key: tls.crt
+            keySecret:
+              name: observability-prometheus-tls
+              key: tls.key
+    alertmanager:
+      alertmanagerSpec:
+        web:
+          tlsConfig:
+            cert:
+              secret:
+                name: observability-alertmanager-tls
+                key: tls.crt
+            keySecret:
+              name: observability-alertmanager-tls
+              key: tls.key
+    grafana:
+      # Disable the kps default http:// Prometheus + Alertmanager datasources;
+      # the observability chart renders https:// ones (same uids) when TLS is on.
+      sidecar:
+        datasources:
+          defaultDatasourceEnabled: false
+          alertmanager:
+            enabled: false
+      # Serve HTTPS via GF_SERVER_* env vars (override grafana.ini); the cert is
+      # mounted from the chart-rendered Certificate via extraVolumes.
+      env:
+        GF_SERVER_PROTOCOL: https
+        GF_SERVER_CERT_FILE: /etc/grafana/tls/tls.crt
+        GF_SERVER_CERT_KEY: /etc/grafana/tls/tls.key
+      extraVolumes:
+        - name: grafana-tls
+          secret:
+            secretName: observability-grafana-tls
+      extraVolumeMounts:
+        - name: grafana-tls
+          mountPath: /etc/grafana/tls
+          readOnly: true
+  loki:
+    # structuredConfig lives under the loki chart's nested `loki:` value
+    # (.Values.loki.structuredConfig), so the path from the observability chart
+    # is loki.loki.structuredConfig. mergedConfig = mergeOverwrite(loki.config,
+    # loki.structuredConfig), so http_tls_* lands in the server block.
+    loki:
+      structuredConfig:
+        server:
+          http_tls_cert_path: /etc/loki/tls/tls.crt
+          http_tls_key_path: /etc/loki/tls/tls.key
+    singleBinary:
+      extraVolumes:
+        - name: loki-tls
+          secret:
+            secretName: observability-loki-tls
+      extraVolumeMounts:
+        - name: loki-tls
+          mountPath: /etc/loki/tls
+          readOnly: true

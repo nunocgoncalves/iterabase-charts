@@ -15,6 +15,35 @@ The Loki Service URL for the Grafana datasource. The loki subchart (single-binar
 exposes the HTTP port on `<release>-loki`; all subcharts share the umbrella
 release name.
 */}}
+{{/*
+Whether internal TLS (global.internalTLS.enabled) is on. The observability
+chart reads this to render stack-component leaf Certificates and to switch the
+Grafana datasource URLs to HTTPS (see stack-internal-tls.yaml + the datasource
+templates). Mirrors the (or tls.enabled (dig internalTLS...)) pattern used by the
+postgresql/redis/control-plane charts.
+*/}}
+{{- define "observability.internalTLS" -}}
+{{- dig "internalTLS" "enabled" false (.Values.global | default (dict)) -}}
+{{- end -}}
+
+{{/*
+The Prometheus / Alertmanager / Loki Service URLs for the Grafana datasources.
+Each subchart exposes its HTTP port on a release-scoped Service; all subcharts
+share the umbrella release name. When internalTLS is on, switch to https (the
+stack-component leaf certs' SANs cover these Service DNS names).
+*/}}
+{{- define "observability.urlScheme" -}}
+{{- if (include "observability.internalTLS" .) }}https{{- else -}}http{{- end -}}
+{{- end -}}
+
+{{- define "observability.prometheusURL" -}}
+{{- printf "%s://%s-kube-prometheus-prometheus.%s.svc:9090" (include "observability.urlScheme" .) .Release.Name .Release.Namespace -}}
+{{- end -}}
+
+{{- define "observability.alertmanagerURL" -}}
+{{- printf "%s://%s-kube-prometheus-alertmanager.%s.svc:9093" (include "observability.urlScheme" .) .Release.Name .Release.Namespace -}}
+{{- end -}}
+
 {{- define "observability.lokiURL" -}}
-{{- printf "http://%s-loki:3100" .Release.Name -}}
+{{- printf "%s://%s-loki.%s.svc:3100" (include "observability.urlScheme" .) .Release.Name .Release.Namespace -}}
 {{- end -}}

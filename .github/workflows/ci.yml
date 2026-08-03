@@ -338,17 +338,31 @@ jobs:
             addresses:
               - ${base}.255.200-${base}.255.250
           EOF
+      - name: install cert-manager (pre-req for the internalTLS pre-install cert hooks)
+        run: |
+          # The cert-issuers internal CA + the stack leaf certs are pre-install
+          # hooks that reference cert-manager CRDs (Certificate/ClusterIssuer).
+          # Helm builds hook objects before applying any resources, so cert-manager
+          # must be installed (CRDs registered) BEFORE the umbrella's pre-install
+          # phase. Install it standalone, then disable the umbrella's bundled
+          # cert-manager dep (use this pre-installed one).
+          helm install cert-manager jetstack/cert-manager \
+            --namespace cert-manager --create-namespace \
+            --set crds.enabled=true --wait --timeout 5m
       - name: install umbrella with observability + internalTLS (kind)
         run: |
           # global.internalTLS on (values-tls.yaml) + the observability stack
-          # (values-observability.yaml). --wait fails if any TLS-serving pod
-          # CrashLoops (bad cert mount / TLS config).
+          # (values-observability.yaml). cert-manager.enabled=false: use the
+          # pre-installed cert-manager (above) so the pre-install cert hooks can
+          # build. --wait fails if any TLS-serving pod CrashLoops (bad cert
+          # mount / TLS config).
           helm install iterabase charts/iterabase-platform \
             --create-namespace -n iterabase-system \
             -f /tmp/kind-edge.yaml \
             -f values-observability.yaml \
             -f values-tls.yaml \
             --set external-dns.enabled=false \
+            --set cert-manager.enabled=false \
             --wait --timeout 15m
       - name: assert the four stack components serve HTTPS (TLS handshake)
         run: |

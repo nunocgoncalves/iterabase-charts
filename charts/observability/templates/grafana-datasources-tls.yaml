@@ -1,6 +1,6 @@
 {{- if .Values.enabled }}
 {{- if (index .Values "kube-prometheus-stack" "enabled") }}
-{{- if (include "observability.internalTLS" .) }}
+{{- if (dig "global" "internalTLS" "enabled" false (.Values.global | default (dict))) }}
 # Prometheus + Alertmanager Grafana datasources over HTTPS, rendered only when
 # internalTLS is on. The kube-prometheus-stack defaults render http:// datasources
 # with a hardcoded scheme (not value-overridable), so when TLS is on they are

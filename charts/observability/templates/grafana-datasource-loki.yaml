@@ -23,7 +23,7 @@ data:
         isDefault: false
         jsonData:
           maxLines: 1000
-          {{- if (include "observability.internalTLS" .) }}
+          {{- if (dig "global" "internalTLS" "enabled" false (.Values.global | default (dict))) }}
           # The internal CA is cert-manager-generated; mounting it into Grafana for
           # proper datasource CA verification is a fast-follow. The connection is
           # still TLS-encrypted (in-cluster).

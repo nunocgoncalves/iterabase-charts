@@ -3,8 +3,9 @@
 # ServiceMonitor scraping the inference-gateway's /metrics endpoint on its http
 # port. The gateway's in-cluster Service is plaintext (it is a TLS client only —
 # its public edge is via ingress-shim), so no scrape TLS config is needed. The
-# /metrics endpoint is a service-repo concern (HOR-408 tracked gap); this monitor
-# scrapes once the endpoint ships.
+# /metrics endpoint ships in the inference-gateway service repo
+# (internal/server/routes.go registers `r.Handle("/metrics", promhttp...)`),
+# so this monitor is a live scrape.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:

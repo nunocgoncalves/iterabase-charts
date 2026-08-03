@@ -296,6 +296,57 @@ jobs:
           [ "$n2" -gt 0 ] || { echo "::error::Prometheus TSDB data did not persist across pod restart (PV not retained)"; exit 1; }
           echo "Prometheus PV-backed data persisted across pod restart"
 
+      - name: assert promtail → Loki log ingestion + Loki PV persistence
+        run: |
+          set -e
+          ns=iterabase-system
+          # Emit a unique marker log from a short-lived pod; promtail tails
+          # container logs (kubernetes_sd role=pod) and pushes them to Loki, so
+          # observing the marker in Loki proves workload log ingestion (HOR-408
+          # outcome: "logs are collected, stored, and routed").
+          marker="lokipvtest$(date +%s)"
+          kubectl run log-emitter --namespace "$ns" --image=busybox:1.36 \
+            --restart=Never --quiet --overwrite \
+            -- sh -c "for i in $(seq 1 45); do echo $marker; sleep 1; done"
+          kubectl port-forward -n "$ns" svc/iterabase-loki 3100:3100 >/dev/null 2>&1 &
+          pf=$!
+          sleep 5
+          wait_marker() {
+            for i in $(seq 1 40); do
+              if curl -fsS -G "http://localhost:3100/loki/api/v1/query_range" \
+                  --data-urlencode 'query={pod="log-emitter"} |= "'$marker'"' \
+                  --data-urlencode "start=$(($(date +%s)-600))000000000" \
+                  --data-urlencode "end=$(($(date +%s)+60))000000000" \
+                  --data-urlencode "limit=5" 2>/dev/null | grep -q "$marker"; then
+                echo found; return 0
+              fi
+              sleep 5
+            done
+            echo notfound
+          }
+          echo "waiting for promtail to ingest the marker log into Loki..."
+          [ "$(wait_marker)" = found ] || { echo "::error::marker log not ingested into Loki (promtail → Loki broken)"; kubectl logs -n "$ns" -l app.kubernetes.io/name=promtail --tail=20 2>/dev/null || true; kill $pf 2>/dev/null || true; exit 1; }
+          echo "promtail → Loki log ingestion OK"
+          # Restart the Loki SingleBinary pod; the filesystem PVC must persist
+          # the TSDB index + chunks so the marker is still queryable (HOR-408
+          # acceptance: Loki persists data across pod restarts).
+          kill $pf 2>/dev/null || true; sleep 1
+          loki_pod=$(kubectl get pods -n "$ns" -l app.kubernetes.io/name=loki,app.kubernetes.io/component=single-binary -o jsonpath='{.items[0].metadata.name}')
+          echo "restarting Loki pod $loki_pod (PV must persist the index/chunks)..."
+          kubectl delete pod -n "$ns" "$loki_pod" --wait
+          for i in $(seq 1 60); do
+            [ -n "$(kubectl get pods -n "$ns" -l app.kubernetes.io/name=loki,app.kubernetes.io/component=single-binary -o name 2>/dev/null)" ] && break
+            sleep 2
+          done
+          kubectl wait --for=condition=Ready pod -n "$ns" -l app.kubernetes.io/name=loki,app.kubernetes.io/component=single-binary --timeout=300s
+          kubectl port-forward -n "$ns" svc/iterabase-loki 3100:3100 >/dev/null 2>&1 &
+          pf=$!
+          sleep 5
+          [ "$(wait_marker)" = found ] || { echo "::error::Loki log data did not persist across pod restart (PV not retained)"; kill $pf 2>/dev/null || true; exit 1; }
+          kill $pf 2>/dev/null || true
+          kubectl delete pod -n "$ns" log-emitter --ignore-not-found >/dev/null 2>&1 || true
+          echo "Loki PV-backed log data persisted across pod restart"
+
   install-observability-tls:
     # Combined TLS + observability runtime check (HOR-408 / F6): installs the
     # umbrella on kind with internalTLS ON (values-tls.yaml) AND the observability

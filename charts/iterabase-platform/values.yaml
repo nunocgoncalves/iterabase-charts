@@ -17,12 +17,28 @@ global:
 # the control-plane's schemas (catalog/identity/permissions) from it.
 redis:
   enabled: true
+  # metrics.enabled (default false): deploy a redis-exporter sidecar... no — a
+  # standalone redis-exporter Deployment + ServiceMonitor owned by the redis
+  # subchart. Flip on with observability (see values-observability.yaml).
+  metrics:
+    enabled: false
 minio:
   enabled: true
+  # metrics.enabled (default false): a ServiceMonitor scraping MinIO's native
+  # /minio/v2/metrics/cluster endpoint (no exporter needed). Flip on with
+  # observability (see values-observability.yaml).
+  metrics:
+    enabled: false
 
 # --- Services ---
 inference-gateway:
   enabled: true
+  # metrics.enabled (default false): a ServiceMonitor scraping the gateway's
+  # /metrics endpoint. The endpoint itself is a service-repo concern (HOR-408
+  # tracked gap); the ServiceMonitor is wired here and scrapes once the endpoint
+  # ships. Flip on with observability (see values-observability.yaml).
+  metrics:
+    enabled: false
   ingress:
     # Dev/kind default host (no real domain — pair with the self-signed issuer
     # below). Override to the real public host in the prod overlay (e.g.
@@ -36,6 +52,19 @@ inference-gateway:
       clusterIssuer: selfsigned # cert-issuers.selfSigned.name
 control-plane:
   enabled: true # provides the shared pgvector Postgres + the schemas the gateway reads
+  # metrics.enabled (default false): ServiceMonitors for the control-plane api +
+  # manager + the modelbackend (vLLM) pods the operator manages. The api/manager
+  # /metrics endpoints are a service-repo concern (HOR-408 tracked gap); the
+  # ServiceMonitors are wired here and scrape once the endpoints ship. vLLM
+  # exposes /metrics natively. Flip on with observability.
+  metrics:
+    enabled: false
+  # Postgres metrics: a postgres-exporter Deployment + ServiceMonitor owned by
+  # the postgresql subchart (nested under control-plane). Connects with the
+  # internal CA when internalTLS is on.
+  postgresql:
+    metrics:
+      enabled: false
 
 # --- Ingress controller (bundled substrate) ---
 # The edge is always a LoadBalancer Service (no hostNetwork). The LB
@@ -62,6 +91,8 @@ ingress-nginx:
       enabled: false
     metrics:
       enabled: false
+      serviceMonitor:
+        enabled: false # flip on with observability (needs the Prometheus Operator CRDs)
 
 # --- MetalLB (LoadBalancer implementation for bare-metal/kind/OPO1) ---
 # The edge's LoadBalancer Service needs an LB implementation. On cloud, the cloud
@@ -78,6 +109,11 @@ metallb:
     enabled: true
   frrk8s:
     enabled: false
+  # Metrics + ServiceMonitor (native to the metallb chart). Flip on with
+  # observability; off by default to keep the default render lean.
+  prometheus:
+    serviceMonitor:
+      enabled: false
 
 metallb-config:
   enabled: false
@@ -95,6 +131,11 @@ cert-manager:
   enabled: true
   crds:
     enabled: true
+  # Metrics + ServiceMonitor (native to the cert-manager chart). Flip on with
+  # observability; off by default to keep the default render lean.
+  prometheus:
+    servicemonitor:
+      enabled: false
 
 cert-issuers:
   enabled: true
@@ -113,6 +154,10 @@ cert-issuers:
 # workloads); flip on with internalTLS (see values-tls.yaml / the prod overlay).
 reloader:
   enabled: false
+  # Metrics + ServiceMonitor (native to the reloader chart). Flip on with
+  # observability; off by default to keep the default render lean.
+  metrics:
+    enabled: false
 
 # --- external-dns (edge DNS → Cloudflare) ---
 # external-dns syncs the gateway Ingress host into Cloudflare (A record), sharing
@@ -149,3 +194,27 @@ external-dns:
     create: true
   serviceAccount:
     create: true
+  # Metrics + ServiceMonitor (native to the external-dns chart). Flip on with
+  # observability; off by default to keep the default render lean.
+  metrics:
+    enabled: false
+  serviceMonitor:
+    enabled: false
+
+# --- Observability (HOR-408) ---
+# Prometheus + Grafana + Loki + Alertmanager (kube-prometheus-stack + loki) with
+# the Prometheus Operator CRDs (ServiceMonitor / PrometheusRule), default alert
+# rules, a Loki Grafana datasource, and optional NVIDIA DCGM (GPU) scraping. The
+# stack is composed by the `observability` subchart (file://../observability),
+# which itself depends on the two upstream charts.
+#
+# Disabled by default — kind/E2E stays lean. Enabling observability alone brings
+# up the stack (Prometheus auto-discovers all ServiceMonitors/PrometheusRules
+# cluster-wide via nil selectors); to actually scrape the platform components,
+# also flip each component's metrics.enabled (see values-observability.yaml,
+# which flips the stack + every metrics knob in one file). Alertmanager email
+# routing is overlay-owned (HOR-408: the OPO1 overlay sets
+# observability.kube-prometheus-stack.alertmanager.config); non-email
+# destinations are deferred (non-goal).
+observability:
+  enabled: false

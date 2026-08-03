@@ -24,3 +24,18 @@ tls:
 auth:
   enabled: false
   password: ""   # default: generated into <release>-redis (key redis-password)
+
+# Metrics (opt-in; flip on with observability — see values-observability.yaml).
+# A standalone redis-exporter Deployment + Service + ServiceMonitor (best
+# practice: the exporter is a separate stateless pod, not a sidecar). Connects
+# with the AUTH password + internal CA when TLS is on; plaintext otherwise. The
+# ServiceMonitor is a Prometheus Operator CRD — rendered regardless but only
+# reconciled when the operator (from the observability chart) is installed.
+metrics:
+  enabled: false
+  image:
+    repository: oliver006/redis_exporter
+    tag: "v1.67.0"
+    pullPolicy: IfNotPresent
+  resources: {}
+  # scrapeInterval: 30s

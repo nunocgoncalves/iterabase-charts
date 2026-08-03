@@ -15,3 +15,13 @@ persistence:
 buckets: []
 
 resources: {}
+
+# Metrics (opt-in; flip on with observability — see values-observability.yaml).
+# MinIO exposes /minio/v2/metrics/cluster natively on the S3 port (no exporter
+# needed). Enabling this sets MINIO_PROMETHEUS_AUTH_TYPE=public on the server
+# (in-cluster scrape without S3 auth) and renders a ServiceMonitor. The
+# ServiceMonitor is a Prometheus Operator CRD — rendered regardless but only
+# reconciled when the operator (from the observability chart) is installed.
+metrics:
+  enabled: false
+  # scrapeInterval: 30s

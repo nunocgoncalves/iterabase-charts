@@ -78,3 +78,38 @@ tls:
   caMountPath: /etc/iterabase/internal-ca/ca.crt
 
 resources: {}
+
+# Metrics (opt-in; flip on with observability — see values-observability.yaml).
+# ServiceMonitors/PodMonitors for the control-plane. The api /metrics endpoint
+# and the manager controller-runtime metrics port are service-repo concerns
+# (HOR-408 tracked gap); the monitors are wired here and scrape once the
+# endpoints ship. The api monitor scrapes over HTTPS with the internal CA when
+# internalTLS is on (the api serves HTTPS from a cert-manager leaf). The
+# ServiceMonitors/PodMonitors are Prometheus Operator CRDs — rendered regardless
+# but only reconciled when the operator (from the observability chart) is
+# installed.
+metrics:
+  enabled: false
+  # scrapeInterval: 30s
+  # The manager's controller-runtime metrics port (name). DORMANT until the
+  # control-plane service repo binds --metrics-bind-address to a port named
+  # http-metrics (HOR-408 tracked gap). Override the port name here once shipped.
+  manager:
+    port: http-metrics
+  # vLLM / model-backend pods (managed by this chart's operator over the
+  # modelbackends CRD). vLLM exposes /metrics natively on its API port, but the
+  # pods are operator-created, so the scrape target (labels + port) depends on
+  # the operator's pod template. Disabled even when metrics.enabled — opt in and
+  # match the operator's labels/port in the overlay (or a service-repo ticket to
+  # standardize them). Defaults assume a part-of=iterabase-platform,
+  # component=model-backend label and an http port.
+  vllm:
+    enabled: false
+    port: http
+    path: /metrics
+    namespaceSelector:
+      any: true
+    selector:
+      matchLabels:
+        app.kubernetes.io/part-of: iterabase-platform
+        app.kubernetes.io/component: model-backend

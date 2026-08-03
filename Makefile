@@ -2,16 +2,20 @@ CHARTS_DIR := charts
 CHARTS := $(notdir $(wildcard $(CHARTS_DIR)/*))
 UMBRELLA := iterabase-platform
 CONTROLPLANE := control-plane
+OBSERVABILITY := observability
 RENDER := /tmp/$(UMBRELLA).rendered.yaml
 RENDER_CP := /tmp/$(CONTROLPLANE).rendered.yaml
 RENDER_TLS := /tmp/$(UMBRELLA).tls.rendered.yaml
+RENDER_OBS := /tmp/$(UMBRELLA).observability.rendered.yaml
 
-.PHONY: build-deps lint template kubeconform template-controlplane kubeconform-controlplane template-tls kubeconform-tls check check-tls clean
+.PHONY: build-deps lint template kubeconform template-controlplane kubeconform-controlplane template-tls kubeconform-tls template-observability kubeconform-observability check check-tls check-observability clean
 
-# control-plane has its own file:// dep (postgresql); build it first so the
-# umbrella vendors control-plane with its nested dependency baked in.
+# control-plane has its own file:// dep (postgresql) and observability has its
+# own upstream deps (kube-prometheus-stack + loki); build them first so the
+# umbrella vendors each with its nested dependencies baked in.
 build-deps:
 	helm dependency build $(CHARTS_DIR)/$(CONTROLPLANE)
+	helm dependency build $(CHARTS_DIR)/$(OBSERVABILITY)
 	helm dependency build $(CHARTS_DIR)/$(UMBRELLA)
 
 lint: build-deps
@@ -49,10 +53,25 @@ template-tls: build-deps
 kubeconform-tls: template-tls
 	kubeconform -strict -kubernetes-version 1.31.0 -ignore-missing-schemas $(RENDER_TLS)
 
-check: lint kubeconform kubeconform-controlplane
+check: lint kubeconform kubeconform-controlplane kubeconform-observability
 
 check-tls: kubeconform-tls
 
+# Static check with the observability stack + every component's metrics on
+# (values-observability.yaml). Catches conditional/render errors in the
+# ServiceMonitor / PodMonitor / PrometheusRule / exporter paths that the
+# default (stack off) `make check` doesn't exercise. The Prometheus Operator
+# CRDs (ServiceMonitor / PodMonitor / PrometheusRule) have no bundled schema, so
+# ignore missing schemas like the platform CRDs above.
+template-observability: build-deps
+	helm template $(UMBRELLA) $(CHARTS_DIR)/$(UMBRELLA) -f values-observability.yaml > $(RENDER_OBS)
+	@echo "rendered $(RENDER_OBS)"
+
+kubeconform-observability: template-observability
+	kubeconform -strict -kubernetes-version 1.31.0 -ignore-missing-schemas $(RENDER_OBS)
+
+check-observability: kubeconform-observability
+
 clean:
-	rm -f $(RENDER) $(RENDER_CP)
-	rm -rf $(CHARTS_DIR)/$(UMBRELLA)/charts $(CHARTS_DIR)/$(CONTROLPLANE)/charts
+	rm -f $(RENDER) $(RENDER_CP) $(RENDER_OBS)
+	rm -rf $(CHARTS_DIR)/$(UMBRELLA)/charts $(CHARTS_DIR)/$(CONTROLPLANE)/charts $(CHARTS_DIR)/$(OBSERVABILITY)/charts

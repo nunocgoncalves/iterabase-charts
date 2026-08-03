@@ -14,6 +14,7 @@ Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella ch
 | `minio` | Self-contained MinIO object storage | bundled only |
 | `cert-issuers` | cert-manager ClusterIssuers (Let's Encrypt DNS-01/Cloudflare + self-signed) | bundled only |
 | `metallb-config` | MetalLB IPAddressPool + L2Advertisement (L2 edge for bare-metal/kind/OPO1) | bundled only |
+| `observability` | Prometheus + Grafana + Loki + Alertmanager (kube-prometheus-stack + loki) + default alert rules + GPU (DCGM) scraping | bundled only |
 
 control-plane ships standalone and is enabled in the umbrella by default (it provides the shared pgvector Postgres + the schemas the gateway reads).
 
@@ -85,7 +86,36 @@ helm repo add jetstack https://charts.jetstack.io
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
 ```
 
-`make build-deps` resolves the umbrella's local + `ingress-nginx` + `metallb` + `cert-manager` (jetstack) + `external-dns` dependencies.
+`make build-deps` resolves the umbrella's local + `ingress-nginx` + `metallb` + `cert-manager` (jetstack) + `external-dns` + `reloader` (stakater) + `kube-prometheus-stack` + `loki` (grafana) dependencies.
+
+## Observability (HOR-408)
+
+The optional `observability` subchart (disabled by default) deploys Prometheus +
+Grafana + Loki + Alertmanager via `kube-prometheus-stack` + `loki`, with the
+Prometheus Operator CRDs (`ServiceMonitor` / `PodMonitor` / `PrometheusRule`),
+PV-backed storage, default alert rules, and a Loki Grafana datasource. Enable it
+with the preset:
+
+```sh
+helm install iterabase charts/iterabase-platform -n iterabase-system --create-namespace \
+  -f values-kind.yaml -f values-observability.yaml --wait
+```
+
+The preset flips the stack on **and** every component's `metrics.enabled` knob,
+so Prometheus scrapes the gateway, control-plane (api/manager), vLLM
+(model-backend pods), Postgres/Redis (via dedicated exporters), MinIO (native),
+and the upstream substrate (ingress-nginx/cert-manager/external-dns/reloader).
+GPU metrics: set `observability.dcgmExporter.enabled=true` (gpu-operator must be
+installed out-of-band). Alertmanager **email routing is overlay-owned** — the
+chart ships a null-receiver default; set
+`observability.kube-prometheus-stack.alertmanager.config` in the prod overlay
+(HOR-408: the OPO1 overlay carries the email receiver).
+
+Caveats (HOR-408 tracked gaps): the inference-gateway / control-plane `/metrics`
+endpoints and the manager's controller-runtime metrics port are service-repo
+concerns — the `ServiceMonitor`s are wired here and scrape once those endpoints
+ship. The vLLM `PodMonitor` target labels/port depend on the operator's pod
+template; match them in the overlay or via a service-repo ticket.
 
 ## Release
 

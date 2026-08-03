@@ -30,3 +30,19 @@ tls:
   caMountPath: /etc/iterabase/internal-ca/ca.crt
 
 resources: {}
+
+# Metrics (opt-in; flip on with observability — see values-observability.yaml).
+# A standalone postgres-exporter Deployment + Service + ServiceMonitor (best
+# practice: the exporter is a separate stateless pod, not a sidecar). Connects
+# with the main user password (from the chart-generated Secret) and the internal
+# CA (sslmode=verify-full) when TLS is on; sslmode=disable otherwise. The
+# ServiceMonitor is a Prometheus Operator CRD — rendered regardless but only
+# reconciled when the operator (from the observability chart) is installed.
+metrics:
+  enabled: false
+  image:
+    repository: quay.io/prometheuscommunity/postgres-exporter
+    tag: "v0.15.0"
+    pullPolicy: IfNotPresent
+  resources: {}
+  # scrapeInterval: 30s

@@ -1,5 +1,5 @@
 {{- if .Values.enabled }}
-{{- if (dig "global" "internalTLS" "enabled" false (.Values.global | default (dict))) }}
+{{- if (dig "internalTLS" "enabled" false (.Values.global | default (dict))) }}
 {{- $ca := (printf "%s-internal-ca-root" .Release.Name) }}
 {{- $ns := .Release.Namespace }}
 {{- $issuer := .Values.tls.issuerName | default "internal-ca" }}

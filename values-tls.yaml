@@ -54,29 +54,52 @@ observability:
           alertmanager:
             enabled: false
       # Serve HTTPS via GF_SERVER_* env vars (override grafana.ini); the cert is
-      # mounted from the chart-rendered Certificate via extraVolumes.
+      # mounted from the chart-rendered Certificate via extraSecretMounts (the
+      # grafana chart's extraVolumes does not support secret volumes).
       env:
         GF_SERVER_PROTOCOL: https
         GF_SERVER_CERT_FILE: /etc/grafana/tls/tls.crt
         GF_SERVER_CERT_KEY: /etc/grafana/tls/tls.key
-      extraVolumes:
+      extraSecretMounts:
         - name: grafana-tls
-          secret:
-            secretName: observability-grafana-tls
-      extraVolumeMounts:
-        - name: grafana-tls
+          secretName: observability-grafana-tls
           mountPath: /etc/grafana/tls
           readOnly: true
+      # Probes must use HTTPS once GF_SERVER_PROTOCOL=https (default is HTTP).
+      readinessProbe:
+        httpGet:
+          path: /api/health
+          port: grafana
+          scheme: HTTPS
+      livenessProbe:
+        httpGet:
+          path: /api/health
+          port: grafana
+          scheme: HTTPS
   loki:
     # structuredConfig lives under the loki chart's nested `loki:` value
     # (.Values.loki.structuredConfig), so the path from the observability chart
     # is loki.loki.structuredConfig. mergedConfig = mergeOverwrite(loki.config,
     # loki.structuredConfig), so http_tls_* lands in the server block.
     loki:
+      # Probes must use HTTPS once the server serves TLS (default is HTTP).
+      readinessProbe:
+        httpGet:
+          path: /ready
+          port: http-metrics
+          scheme: HTTPS
+        periodSeconds: 10
+        initialDelaySeconds: 15
+      livenessProbe:
+        httpGet:
+          path: /ready
+          port: http-metrics
+          scheme: HTTPS
       structuredConfig:
         server:
-          http_tls_cert_path: /etc/loki/tls/tls.crt
-          http_tls_key_path: /etc/loki/tls/tls.key
+          http_tls_config:
+            cert_file: /etc/loki/tls/tls.crt
+            key_file: /etc/loki/tls/tls.key
     singleBinary:
       extraVolumes:
         - name: loki-tls

@@ -97,6 +97,12 @@ loki:
   enabled: true
   deploymentMode: SingleBinary
   loki:
+    # Single-tenant mode for the in-cluster platform install: promtail/Alloy
+    # push without an X-Scope-OrgID header. The loki chart defaults
+    # auth_enabled=true (multi-tenant), which 401-rejects every promtail push
+    # ("no org id") so NO workload logs reach Loki. Flip to false for the
+    # single-tenant platform default; a multi-tenant overlay can re-enable.
+    auth_enabled: false
     commonConfig:
       replication_factor: 1
     storage:

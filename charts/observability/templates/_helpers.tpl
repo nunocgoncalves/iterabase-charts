@@ -22,8 +22,12 @@ Grafana datasource URLs to HTTPS (see stack-internal-tls.yaml + the datasource
 templates). Mirrors the (or tls.enabled (dig internalTLS...)) pattern used by the
 postgresql/redis/control-plane charts.
 */}}
+{{/*
+Whether internal TLS (global.internalTLS.enabled) is on. Use dig directly in
+`if` (NOT via include — include stringifies "false", which is truthy).
+*/}}
 {{- define "observability.internalTLS" -}}
-{{- dig "internalTLS" "enabled" false (.Values.global | default (dict)) -}}
+{{- dig "global" "internalTLS" "enabled" false (.Values.global | default (dict)) -}}
 {{- end -}}
 
 {{/*
@@ -33,7 +37,7 @@ share the umbrella release name. When internalTLS is on, switch to https (the
 stack-component leaf certs' SANs cover these Service DNS names).
 */}}
 {{- define "observability.urlScheme" -}}
-{{- if (include "observability.internalTLS" .) }}https{{- else -}}http{{- end -}}
+{{- if (dig "global" "internalTLS" "enabled" false (.Values.global | default (dict))) }}https{{- else -}}http{{- end -}}
 {{- end -}}
 
 {{- define "observability.prometheusURL" -}}

@@ -358,12 +358,18 @@ jobs:
         if: failure()
         run: |
           kubectl get pods -n iterabase-system -o wide || true
+          echo "=== Certificates + issuers ==="
+          kubectl get certificate -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[0].status,REASON:.status.conditions[0].reason,MSG:.status.conditions[0].message 2>/dev/null || true
+          kubectl get clusterissuer -o custom-columns=NAME:.metadata.name,READY:.status.conditions[0].status 2>/dev/null || true
+          echo "=== cert-manager logs (last 30) ==="
+          kubectl logs -n iterabase-system -l app.kubernetes.io/name=cert-manager --tail=30 2>/dev/null || true
+          echo "=== non-Running pods ==="
           kubectl get pods -n iterabase-system --no-headers | awk '{print $1}' | while read p; do
             st=$(kubectl get pod -n iterabase-system "$p" -o jsonpath='{.status.phase}' 2>/dev/null)
             [ "$st" = "Running" ] && continue
             echo "===== $p ($st) ====="
-            kubectl describe pod -n iterabase-system "$p" 2>/dev/null | tail -25
-            kubectl logs -n iterabase-system "$p" --tail=15 2>/dev/null
+            kubectl describe pod -n iterabase-system "$p" 2>/dev/null | grep -iE "Events:|Warning|Failed|Mount|secret|not found|createcontainer" | tail -15
+            kubectl logs -n iterabase-system "$p" --tail=20 2>/dev/null | tail -20
           done || true
       - name: assert the four stack components serve HTTPS (TLS handshake)
         run: |

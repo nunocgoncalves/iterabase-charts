@@ -338,32 +338,33 @@ jobs:
             addresses:
               - ${base}.255.200-${base}.255.250
           EOF
-      - name: install cert-manager (pre-req for the internalTLS pre-install cert hooks)
+      - name: install umbrella (plaintext) then upgrade with internalTLS
         run: |
-          # The cert-issuers internal CA + the stack leaf certs are pre-install
-          # hooks that reference cert-manager CRDs (Certificate/ClusterIssuer).
-          # Helm builds hook objects before applying any resources, so cert-manager
-          # must be installed (CRDs registered) BEFORE the umbrella's pre-install
-          # phase. Install it standalone, then disable the umbrella's bundled
-          # cert-manager dep (use this pre-installed one).
-          helm install cert-manager jetstack/cert-manager \
-            --namespace cert-manager --create-namespace \
-            --set crds.enabled=true --wait --timeout 5m
-      - name: install umbrella with observability + internalTLS (kind)
-        run: |
-          # global.internalTLS on (values-tls.yaml) + the observability stack
-          # (values-observability.yaml). cert-manager.enabled=false: use the
-          # pre-installed cert-manager (above) so the pre-install cert hooks can
-          # build. --wait fails if any TLS-serving pod CrashLoops (bad cert
-          # mount / TLS config).
+          # The cert-issuers internal CA + component leaf certs are pre-install/
+          # pre-upgrade hooks that reference cert-manager CRDs. cert-manager is a
+          # bundled dep, so install plaintext first (cert-manager comes up), then
+          # upgrade with internalTLS on — the pre-upgrade cert hooks now run with
+          # cert-manager Ready and CRDs registered. --wait fails if any TLS-
+          # serving pod CrashLoops (bad cert mount / TLS config).
           helm install iterabase charts/iterabase-platform \
             --create-namespace -n iterabase-system \
-            -f /tmp/kind-edge.yaml \
-            -f values-observability.yaml \
-            -f values-tls.yaml \
-            --set external-dns.enabled=false \
-            --set cert-manager.enabled=false \
-            --wait --timeout 15m
+            -f /tmp/kind-edge.yaml -f values-observability.yaml \
+            --set external-dns.enabled=false --wait --timeout 12m
+          helm upgrade iterabase charts/iterabase-platform \
+            -n iterabase-system \
+            -f /tmp/kind-edge.yaml -f values-observability.yaml -f values-tls.yaml \
+            --set external-dns.enabled=false --wait --timeout 15m
+      - name: debug pods on failure
+        if: failure()
+        run: |
+          kubectl get pods -n iterabase-system -o wide || true
+          kubectl get pods -n iterabase-system --no-headers | awk '{print $1}' | while read p; do
+            st=$(kubectl get pod -n iterabase-system "$p" -o jsonpath='{.status.phase}' 2>/dev/null)
+            [ "$st" = "Running" ] && continue
+            echo "===== $p ($st) ====="
+            kubectl describe pod -n iterabase-system "$p" 2>/dev/null | tail -25
+            kubectl logs -n iterabase-system "$p" --tail=15 2>/dev/null
+          done || true
       - name: assert the four stack components serve HTTPS (TLS handshake)
         run: |
           set -e

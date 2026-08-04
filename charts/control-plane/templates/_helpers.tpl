@@ -10,8 +10,16 @@
 {{- printf "%s-control-plane-api" .Release.Name -}}
 {{- end -}}
 
+{{- define "control-plane.gatewayName" -}}
+{{- printf "%s-control-plane-gateway" .Release.Name -}}
+{{- end -}}
+
 {{- define "control-plane.serviceAccountName" -}}
 {{- printf "%s-control-plane-manager" .Release.Name -}}
+{{- end -}}
+
+{{- define "control-plane.gatewayServiceAccountName" -}}
+{{- printf "%s-control-plane-gateway" .Release.Name -}}
 {{- end -}}
 
 {{- define "control-plane.jwtSecretName" -}}
@@ -38,6 +46,47 @@ postgres://{{ .Values.postgresql.auth.username }}:$(PGPASSWORD)@{{ include "cont
 
 {{- define "control-plane.artifactSecretName" -}}
 {{- default (printf "%s-minio-artifacts" .Release.Name) .Values.artifact.credentialSecret -}}
+{{- end -}}
+
+{{- define "control-plane.artifactEnv" -}}
+- name: ARTIFACT_ENABLED
+  value: {{ .Values.artifact.enabled | quote }}
+{{- if .Values.artifact.enabled }}
+- name: ARTIFACT_ENDPOINT
+  value: {{ include "control-plane.artifactEndpoint" . | quote }}
+- name: ARTIFACT_ACCESS_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "control-plane.artifactSecretName" . }}
+      key: accessKey
+- name: ARTIFACT_SECRET_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "control-plane.artifactSecretName" . }}
+      key: secretKey
+- name: ARTIFACT_BUCKET
+  value: {{ .Values.artifact.bucket | quote }}
+- name: ARTIFACT_SECURE
+  value: {{ .Values.artifact.secure | quote }}
+- name: ARTIFACT_MAX_SIZE_BYTES
+  value: {{ printf "%d" (int64 .Values.artifact.maxSizeBytes) | quote }}
+{{- with .Values.artifact.defaultRetention }}
+- name: ARTIFACT_DEFAULT_RETENTION
+  value: {{ . | quote }}
+{{- end }}
+- name: ARTIFACT_PENDING_TTL
+  value: {{ .Values.artifact.pendingTTL | quote }}
+- name: ARTIFACT_SWEEP_INTERVAL
+  value: {{ .Values.artifact.sweepInterval | quote }}
+{{- end }}
+{{- end -}}
+
+{{- define "control-plane.gatewayTLSSecretName" -}}
+{{- default (printf "%s-control-plane-gateway-tls" .Release.Name) .Values.gateway.tls.serverSecret -}}
+{{- end -}}
+
+{{- define "control-plane.gatewayCASecretName" -}}
+{{- default (printf "%s-control-plane-gateway-ca" .Release.Name) .Values.gateway.tls.clientCASecret -}}
 {{- end -}}
 
 {{- define "control-plane.apiTLSSecretName" -}}

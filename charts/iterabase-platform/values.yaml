@@ -55,6 +55,8 @@ inference-gateway:
       clusterIssuer: selfsigned # cert-issuers.selfSigned.name
 control-plane:
   enabled: true # provides the shared pgvector Postgres + the schemas the gateway reads
+  gateway:
+    enabled: true # mTLS workload/tool/artifact service; generated CA is stable across upgrades
   artifact:
     enabled: true
     endpoint: "" # default: <release>-minio:9000

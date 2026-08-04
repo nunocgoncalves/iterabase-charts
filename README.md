@@ -79,7 +79,11 @@ to `get` on the configured Flux `GitRepository`; the runner receives the mTLS
 SPIFFE leaf but no Kubernetes or Git credential. The materializer verifies the
 exact Flux artifact digest and writes immutable generation directories. The
 runner mounts those files read-only, validates all manifests/bundles atomically,
-and connects outbound to the tool gateway—there is no inbound runner endpoint.
+and connects outbound to the tool gateway. It exposes no inbound execution API;
+when `control-plane.metrics.enabled=true` (or the narrower
+`control-plane.toolRunner.metrics.enabled=true`), a metrics-only ServiceMonitor
+scrapes separate materializer and runner `/metrics` endpoints, matching the inference
+gateway observability pattern.
 
 Configure exact dotted tool-name namespaces through
 `control-plane.toolRunner.allowedToolNamespaces`; wildcards are not supported.

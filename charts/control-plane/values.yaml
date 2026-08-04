@@ -53,6 +53,10 @@ toolRunner:
   maxGenerations: 8
   maxLoadedBytes: 536870912
   drainMaxAge: 24h
+  metrics:
+    enabled: false # also enabled by the chart-wide metrics.enabled observability knob
+    materializerPort: 9091
+    runnerPort: 9092
   resources: {}
   materializerResources: {}
 
@@ -133,10 +137,11 @@ tls:
 resources: {}
 
 # Metrics (opt-in; flip on with observability — see values-observability.yaml).
-# ServiceMonitors/PodMonitors for the control-plane. The api /metrics endpoint
-# and the manager controller-runtime metrics port are service-repo concerns
-# (HOR-408 tracked gap); the monitors are wired here and scrape once the
-# endpoints ship. The api monitor scrapes over HTTPS with the internal CA when
+# ServiceMonitors/PodMonitors for the control-plane. The tool runner ships live
+# materializer + runner /metrics endpoints. The api endpoint and manager
+# controller-runtime metrics port remain service-repo concerns (HOR-408 tracked
+# gap); those monitors scrape once the endpoints ship. The api monitor scrapes
+# over HTTPS with the internal CA when
 # internalTLS is on (the api serves HTTPS from a cert-manager leaf). The
 # ServiceMonitors/PodMonitors are Prometheus Operator CRDs — rendered regardless
 # but only reconciled when the operator (from the observability chart) is

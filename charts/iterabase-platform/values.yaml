@@ -66,11 +66,10 @@ control-plane:
     bucket: iterabase-artifacts
     credentialSecret: "" # default: <release>-minio-artifacts
     defaultRetention: "" # indefinite unless the data agreement sets a duration
-  # metrics.enabled (default false): ServiceMonitors for the control-plane api +
-  # manager + the modelbackend (vLLM) pods the operator manages. The api/manager
-  # /metrics endpoints are a service-repo concern (HOR-408 tracked gap); the
-  # ServiceMonitors are wired here and scrape once the endpoints ship. vLLM
-  # exposes /metrics natively. Flip on with observability.
+  # metrics.enabled (default false): ServiceMonitors for the control-plane api,
+  # manager, trusted tool runner, and modelbackend (vLLM) pods. The tool runner
+  # and vLLM expose live /metrics endpoints; api/manager remain a service-repo
+  # concern (HOR-408 tracked gap). Flip on with observability.
   metrics:
     enabled: false
   # Postgres metrics: a postgres-exporter Deployment + ServiceMonitor owned by

@@ -50,9 +50,10 @@ jobs:
           helm repo add stakater https://stakater.github.io/stakater-charts
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo add grafana https://grafana.github.io/helm-charts
-      - name: build deps (control-plane's nested postgresql first, then the umbrella)
+      - name: build deps (nested charts, certificate substrate, then umbrella)
         run: |
           helm dependency build charts/control-plane
+          helm dependency build charts/cert-manager-substrate
           helm dependency build charts/iterabase-platform
       - name: compute MetalLB pool from the kind docker-bridge subnet
         run: |
@@ -82,15 +83,22 @@ jobs:
           cat /tmp/kind-edge.yaml
       - name: install umbrella (LoadBalancer edge + MetalLB + TLS for kind)
         run: |
-          # Defaults render the public edge: ingress-nginx (LoadBalancer) +
-          # cert-manager + cert-issuers (self-signed) + the gateway Ingress (host
-          # + TLS). MetalLB (from /tmp/kind-edge.yaml) provides the LB impl; the
+          # The ordered substrate release establishes cert-manager first. The
+          # platform then renders the public edge: ingress-nginx (LoadBalancer),
+          # cert-issuers (self-signed), and the gateway Ingress (host + TLS).
+          # MetalLB (from /tmp/kind-edge.yaml) provides the LB impl; the
           # metallb-config CRs (post-install hooks) allocate the pool. external-dns
-          # is off (no real Cloudflare zone in kind).
-          helm install iterabase charts/iterabase-platform \
+          # is off (no real Cloudflare zone in kind). The generic chart job has
+          # no Flux source or cross-repository runner image; the dedicated
+          # kind+Flux contract validates that enabled path.
+          helm install iterabase-cert-manager charts/cert-manager-substrate \
             --create-namespace -n iterabase-system \
+            --wait --timeout 5m
+          helm install iterabase charts/iterabase-platform \
+            -n iterabase-system \
             -f /tmp/kind-edge.yaml \
             --set external-dns.enabled=false \
+            --set control-plane.toolRunner.enabled=false \
             --wait --timeout 12m
       - name: validate control-plane manager CRDs, RBAC, and cache stability
         run: |
@@ -197,9 +205,9 @@ jobs:
           exit 1
       - name: wait for cert-manager to issue the gateway TLS cert
         run: |
-          # cert-issuers renders the `selfsigned` ClusterIssuer as a post-install
-          # hook (after cert-manager is Ready); wait for it, then for cert-manager's
-          # ingress-shim to issue the gateway cert into the TLS Secret.
+          # The platform manages the selfsigned ClusterIssuer normally after
+          # the ordered substrate is Ready; ingress-shim then issues the edge
+          # certificate into the gateway TLS Secret.
           for i in $(seq 1 60); do
             kubectl get clusterissuer selfsigned >/dev/null 2>&1 && break
             sleep 1
@@ -263,10 +271,11 @@ jobs:
           helm repo add stakater https://stakater.github.io/stakater-charts
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo add grafana https://grafana.github.io/helm-charts
-      - name: build deps (control-plane + observability nested deps, then umbrella)
+      - name: build deps (nested charts, certificate substrate, then umbrella)
         run: |
           helm dependency build charts/control-plane
           helm dependency build charts/observability
+          helm dependency build charts/cert-manager-substrate
           helm dependency build charts/iterabase-platform
       - name: compute MetalLB pool from the kind docker-bridge subnet
         run: |
@@ -290,14 +299,18 @@ jobs:
           cat /tmp/kind-edge.yaml
       - name: install umbrella with the observability stack + edge (kind)
         run: |
-          # Public edge (ingress-nginx LB + cert-manager TLS, as in the
-          # `install` job) PLUS the observability preset so the full stack +
-          # Promtail + every component's metrics/exporter render and start.
-          helm install iterabase charts/iterabase-platform \
+          # Install the certificate substrate first, then the public edge plus
+          # observability preset. The runner is covered by its dedicated
+          # kind+Flux contract, not this chart-only stack job.
+          helm install iterabase-cert-manager charts/cert-manager-substrate \
             --create-namespace -n iterabase-system \
+            --wait --timeout 5m
+          helm install iterabase charts/iterabase-platform \
+            -n iterabase-system \
             -f /tmp/kind-edge.yaml \
             -f values-observability.yaml \
             --set external-dns.enabled=false \
+            --set control-plane.toolRunner.enabled=false \
             --wait --timeout 15m
       - name: assert the four stack components + promtail + exporters are ready
         run: |
@@ -464,10 +477,11 @@ jobs:
           helm repo add stakater https://stakater.github.io/stakater-charts
           helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
           helm repo add grafana https://grafana.github.io/helm-charts
-      - name: build deps (control-plane + observability nested deps, then umbrella)
+      - name: build deps (nested charts, certificate substrate, then umbrella)
         run: |
           helm dependency build charts/control-plane
           helm dependency build charts/observability
+          helm dependency build charts/cert-manager-substrate
           helm dependency build charts/iterabase-platform
       - name: compute MetalLB pool from the kind docker-bridge subnet
         run: |
@@ -482,22 +496,22 @@ jobs:
             addresses:
               - ${base}.255.200-${base}.255.250
           EOF
-      - name: install umbrella (plaintext) then upgrade with internalTLS
+      - name: install certificate substrate then internal-TLS platform
         run: |
-          # The cert-issuers internal CA + component leaf certs are pre-install/
-          # pre-upgrade hooks that reference cert-manager CRDs. cert-manager is a
-          # bundled dep, so install plaintext first (cert-manager comes up), then
-          # upgrade with internalTLS on — the pre-upgrade cert hooks now run with
-          # cert-manager Ready and CRDs registered. --wait fails if any TLS-
-          # serving pod CrashLoops (bad cert mount / TLS config).
-          helm install iterabase charts/iterabase-platform \
+          # cert-manager is a separate, ordered release. Its CRDs, controller,
+          # and webhook are Ready before the platform submits issuers or leaf
+          # Certificates, so no lifecycle hooks or plaintext bootstrap are
+          # required. This chart-only job has no Flux source, so runner runtime
+          # coverage stays in the dedicated kind+Flux contract.
+          helm install iterabase-cert-manager charts/cert-manager-substrate \
             --create-namespace -n iterabase-system \
-            -f /tmp/kind-edge.yaml -f values-observability.yaml \
-            --set external-dns.enabled=false --wait --timeout 12m
-          helm upgrade iterabase charts/iterabase-platform \
+            --wait --timeout 5m
+          helm install iterabase charts/iterabase-platform \
             -n iterabase-system \
             -f /tmp/kind-edge.yaml -f values-observability.yaml -f values-tls.yaml \
-            --set external-dns.enabled=false --wait --timeout 15m
+            --set external-dns.enabled=false \
+            --set control-plane.toolRunner.enabled=false \
+            --wait --timeout 15m
       - name: debug pods on failure
         if: failure()
         run: |
@@ -519,8 +533,8 @@ jobs:
         run: |
           set -e
           ns=iterabase-system
-          # Wait for cert-manager to issue the 4 stack leaf certs (chart-rendered
-          # Certificates, pre-install hooks off the internal CA).
+          # Wait for cert-manager to issue the four normally managed stack leaf
+          # Certificates from the internal CA.
           for s in observability-prometheus-tls observability-alertmanager-tls observability-grafana-tls observability-loki-tls; do
             echo "waiting for cert Secret $s ..."
             for i in $(seq 1 90); do

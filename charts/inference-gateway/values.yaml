@@ -14,8 +14,8 @@ ingress:
   enabled: true
   className: nginx
   host: "" # catch-all when empty (HTTP only); REQUIRED when tls.enabled (cert SAN)
-  # TLS via cert-manager. Enable alongside the umbrella's cert-manager +
-  # cert-issuers deps: clusterIssuer names a ClusterIssuer cert-issuers renders
+  # TLS via the prerequisite cert-manager substrate plus this platform's
+  # cert-issuers dependency: clusterIssuer names a rendered ClusterIssuer
   # (selfsigned for kind/E2E, letsencrypt-prod for the prod overlay). cert-manager's
   # ingress-shim issues the cert into secretName (stable across upgrades) and
   # ingress-nginx serves it. Disable (tls.enabled=false) for a plain-HTTP edge.

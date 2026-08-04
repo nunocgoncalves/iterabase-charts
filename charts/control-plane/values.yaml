@@ -32,6 +32,9 @@ gateway:
     generated: true
     serverSecret: "" # default: <release>-control-plane-gateway-tls
     clientCASecret: "" # default: <release>-control-plane-gateway-ca
+    # ClusterIssuers read CA Secrets from cert-manager's cluster-resource
+    # namespace. Empty uses this release namespace (the umbrella default).
+    clusterResourceNamespace: ""
   resources: {}
 
 toolRunner:

@@ -1,6 +1,7 @@
 CHARTS_DIR := charts
 CHARTS := $(notdir $(wildcard $(CHARTS_DIR)/*))
 UMBRELLA := iterabase-platform
+CERT_MANAGER_SUBSTRATE := cert-manager-substrate
 CONTROLPLANE := control-plane
 OBSERVABILITY := observability
 RENDER := /tmp/$(UMBRELLA).rendered.yaml
@@ -8,7 +9,7 @@ RENDER_CP := /tmp/$(CONTROLPLANE).rendered.yaml
 RENDER_TLS := /tmp/$(UMBRELLA).tls.rendered.yaml
 RENDER_OBS := /tmp/$(UMBRELLA).observability.rendered.yaml
 
-.PHONY: build-deps lint template kubeconform template-controlplane kubeconform-controlplane template-tls kubeconform-tls template-observability kubeconform-observability check-service-selectors check-redis-exporter-auth check-artifact-config check-tool-runner check-manager-contract check check-tls check-observability clean
+.PHONY: build-deps lint template kubeconform template-controlplane kubeconform-controlplane template-tls kubeconform-tls template-observability kubeconform-observability check-certificate-substrate check-service-selectors check-redis-exporter-auth check-artifact-config check-tool-runner check-manager-contract check check-tls check-observability clean
 
 # control-plane has its own file:// dep (postgresql) and observability has its
 # own upstream deps (kube-prometheus-stack + loki); build them first so the
@@ -16,6 +17,7 @@ RENDER_OBS := /tmp/$(UMBRELLA).observability.rendered.yaml
 build-deps:
 	helm dependency build $(CHARTS_DIR)/$(CONTROLPLANE)
 	helm dependency build $(CHARTS_DIR)/$(OBSERVABILITY)
+	helm dependency build $(CHARTS_DIR)/$(CERT_MANAGER_SUBSTRATE)
 	helm dependency build $(CHARTS_DIR)/$(UMBRELLA)
 
 lint: build-deps
@@ -53,6 +55,9 @@ template-tls: build-deps
 kubeconform-tls: template-tls
 	kubeconform -strict -kubernetes-version 1.31.0 -ignore-missing-schemas $(RENDER_TLS)
 
+check-certificate-substrate: build-deps
+	./scripts/check-certificate-substrate.sh
+
 check-service-selectors:
 	./scripts/check-service-selectors.sh
 
@@ -68,7 +73,7 @@ check-tool-runner:
 check-manager-contract:
 	./scripts/check-manager-contract.sh
 
-check: lint kubeconform kubeconform-controlplane kubeconform-observability check-service-selectors check-redis-exporter-auth check-artifact-config check-tool-runner check-manager-contract
+check: lint kubeconform kubeconform-controlplane kubeconform-observability check-certificate-substrate check-service-selectors check-redis-exporter-auth check-artifact-config check-tool-runner check-manager-contract
 
 check-tls: kubeconform-tls check-redis-exporter-auth
 
@@ -89,4 +94,4 @@ check-observability: kubeconform-observability
 
 clean:
 	rm -f $(RENDER) $(RENDER_CP) $(RENDER_OBS)
-	rm -rf $(CHARTS_DIR)/$(UMBRELLA)/charts $(CHARTS_DIR)/$(CONTROLPLANE)/charts $(CHARTS_DIR)/$(OBSERVABILITY)/charts
+	rm -rf $(CHARTS_DIR)/$(UMBRELLA)/charts $(CHARTS_DIR)/$(CERT_MANAGER_SUBSTRATE)/charts $(CHARTS_DIR)/$(CONTROLPLANE)/charts $(CHARTS_DIR)/$(OBSERVABILITY)/charts

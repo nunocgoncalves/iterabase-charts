@@ -70,11 +70,6 @@ metallb:
     serviceMonitor:
       enabled: false
 
-cert-manager:
-  prometheus:
-    servicemonitor:
-      enabled: true
-
 external-dns:
   metrics:
     enabled: true

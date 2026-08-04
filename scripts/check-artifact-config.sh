@@ -43,8 +43,8 @@ grep -q 'command: \["/gateway"\]' <<<"$gateway"
 grep -q 'name: artifact-check-minio-artifacts' <<<"$gateway"
 echo "OK: gateway Deployment + Service render with the dedicated artifact Secret"
 
-platform=$(helm template artifact-platform charts/iterabase-platform)
-grep -q '^kind: CSIDriver$' <<<"$platform"
-grep -q '^  name: csi.cert-manager.io$' <<<"$platform"
-grep -q 'image: "quay.io/jetstack/cert-manager-csi-driver:v0.15.0"' <<<"$platform"
-echo "OK: umbrella renders the pinned cert-manager CSI driver for AgentPool leaves"
+substrate=$(helm template artifact-cert-manager charts/cert-manager-substrate)
+grep -q '^kind: CSIDriver$' <<<"$substrate"
+grep -q '^  name: csi.cert-manager.io$' <<<"$substrate"
+grep -q 'image: "quay.io/jetstack/cert-manager-csi-driver:v0.15.0"' <<<"$substrate"
+echo "OK: certificate substrate renders the pinned CSI driver for AgentPool leaves"

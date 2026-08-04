@@ -488,6 +488,38 @@ jobs:
       - name: assert TLS data and exporter EndpointSlices are disjoint
         run: python3 scripts/assert-service-endpoints.py
 
+      - name: assert PostgreSQL and Redis exporters reach their TLS+AUTH backends
+        run: |
+          set -euo pipefail
+          ns=iterabase-system
+          kubectl port-forward -n "$ns" svc/iterabase-kube-prometheus-prometheus 19090:9090 >/dev/null 2>&1 &
+          pf=$!
+          trap 'kill "$pf" 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 30); do
+            curl -fsS -k https://localhost:19090/-/ready >/dev/null 2>&1 && break
+            sleep 2
+          done
+          curl -fsS -k https://localhost:19090/-/ready >/dev/null
+
+          for metric in pg_up redis_up; do
+            value=""
+            for _ in $(seq 1 60); do
+              response=$(curl -fsS -k -G https://localhost:19090/api/v1/query \
+                --data-urlencode "query=$metric")
+              value=$(python3 -c 'import json, sys; result=json.load(sys.stdin)["data"]["result"]; print(result[0]["value"][1] if result else "")' <<<"$response")
+              [ "$value" = 1 ] && break
+              sleep 5
+            done
+            if [ "$value" != 1 ]; then
+              echo "::error::$metric did not become 1 (last value: ${value:-missing})"
+              [ "$metric" = pg_up ] && exporter_name=postgresql || exporter_name=redis
+              kubectl logs -n "$ns" -l app.kubernetes.io/name="$exporter_name",app.kubernetes.io/component=exporter --tail=50 2>/dev/null || true
+              exit 1
+            fi
+            echo "$metric=1"
+          done
+
       - name: assert TLS client paths (Promtail → Loki + Prometheus → Alertmanager)
         run: |
           set -euo pipefail

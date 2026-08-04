@@ -1,7 +1,7 @@
 {{- if .Values.enabled }}
 {{- if .Values.metrics.enabled }}
 {{- $tls := (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
-{{- $auth := .Values.auth.enabled }}
+{{- $auth := (or .Values.auth.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
 {{- $caSecret := (printf "%s-internal-ca-root" .Release.Name) }}
 {{- $name := (printf "%s-redis-exporter" .Release.Name) }}
 # redis-exporter: standalone Deployment + Service + ServiceMonitor. Separate pod
@@ -51,8 +51,9 @@ spec:
           # --redis.password-file expects a JSON password array on v1.67.0 (not
           # the raw Secret), so pass the runtime password via --redis.password with
           # K8s $(VAR) arg expansion from the REDIS_PASSWORD env var (no shell —
-          # the image is distroless). TLS does not imply AUTH (redis auth is a
-          # separate knob) — the password is used only when auth.enabled.
+          # the image is distroless). The umbrella's global internal-TLS mode
+          # implies AUTH for the Redis server, so it must imply exporter AUTH too;
+          # standalone tls.enabled still remains independent from auth.enabled.
           args:
             - --redis.addr={{ if $tls }}rediss://{{ end }}{{ include "redis.name" . }}:6379
             {{- if $tls }}

@@ -54,6 +54,12 @@ apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: platform-spiffe-ca
+  annotations:
+    # The umbrella installs cert-manager in the same release. Delay this CR
+    # until its CRD and webhook are established; the gateway server certificate
+    # itself is already signed from the stable chart-generated CA above.
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "20"
   labels:
     {{- include "control-plane.labels" . | nindent 4 }}
     app.kubernetes.io/component: gateway-ca

@@ -89,8 +89,9 @@ jobs:
           # MetalLB (from /tmp/kind-edge.yaml) provides the LB impl; the
           # metallb-config CRs (post-install hooks) allocate the pool. external-dns
           # is off (no real Cloudflare zone in kind). The generic chart job has
-          # no Flux source or cross-repository runner image; the dedicated
-          # kind+Flux contract validates that enabled path.
+          # no Flux source or cross-repository runner image; use the published
+          # control-plane tag until 0.0.19 is released, while the dedicated
+          # kind+Flux contract validates the new enabled path.
           helm install iterabase-cert-manager charts/cert-manager-substrate \
             --create-namespace -n iterabase-system \
             --wait --timeout 5m
@@ -98,6 +99,7 @@ jobs:
             -n iterabase-system \
             -f /tmp/kind-edge.yaml \
             --set external-dns.enabled=false \
+            --set control-plane.image.tag=0.0.18 \
             --set control-plane.toolRunner.enabled=false \
             --wait --timeout 12m
       - name: validate control-plane manager CRDs, RBAC, and cache stability
@@ -300,8 +302,9 @@ jobs:
       - name: install umbrella with the observability stack + edge (kind)
         run: |
           # Install the certificate substrate first, then the public edge plus
-          # observability preset. The runner is covered by its dedicated
-          # kind+Flux contract, not this chart-only stack job.
+          # observability preset. Use the published control-plane tag; the new
+          # runner is covered by its dedicated kind+Flux contract, not this
+          # chart-only stack job.
           helm install iterabase-cert-manager charts/cert-manager-substrate \
             --create-namespace -n iterabase-system \
             --wait --timeout 5m
@@ -310,6 +313,7 @@ jobs:
             -f /tmp/kind-edge.yaml \
             -f values-observability.yaml \
             --set external-dns.enabled=false \
+            --set control-plane.image.tag=0.0.18 \
             --set control-plane.toolRunner.enabled=false \
             --wait --timeout 15m
       - name: assert the four stack components + promtail + exporters are ready
@@ -501,8 +505,9 @@ jobs:
           # cert-manager is a separate, ordered release. Its CRDs, controller,
           # and webhook are Ready before the platform submits issuers or leaf
           # Certificates, so no lifecycle hooks or plaintext bootstrap are
-          # required. This chart-only job has no Flux source, so runner runtime
-          # coverage stays in the dedicated kind+Flux contract.
+          # required. Use the published control-plane tag; this chart-only job
+          # has no Flux source, so runner runtime coverage stays in the dedicated
+          # kind+Flux contract.
           helm install iterabase-cert-manager charts/cert-manager-substrate \
             --create-namespace -n iterabase-system \
             --wait --timeout 5m
@@ -510,6 +515,7 @@ jobs:
             -n iterabase-system \
             -f /tmp/kind-edge.yaml -f values-observability.yaml -f values-tls.yaml \
             --set external-dns.enabled=false \
+            --set control-plane.image.tag=0.0.18 \
             --set control-plane.toolRunner.enabled=false \
             --wait --timeout 15m
       - name: debug pods on failure

@@ -25,6 +25,8 @@ inference-gateway:
 
 control-plane:
   metrics:
+    # Also creates the trusted tool runner's metrics-only ServiceMonitor for its
+    # live materializer + runner endpoints.
     enabled: true
     # vLLM / model-backend pods are operator-created over the ModelBackend CRD;
     # vLLM exposes /metrics natively on its serving port (http). The control-

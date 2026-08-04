@@ -10,9 +10,20 @@ persistence:
   storageClass: "" # use cluster default (k3s local-path)
   size: 20Gi
 
-# Buckets to create on first start (mc init Job is a future harden); v1 deploys
-# the server only.
-buckets: []
+# Immutable artifact-service bucket (HOR-399). The provisioning Job uses the
+# MinIO root credential once to create this bucket + a dedicated bucket-scoped
+# user. API/gateway receive only the dedicated credential.
+artifactService:
+  enabled: true
+  bucket: iterabase-artifacts
+  credentialSecret: "" # default: <release>-minio-artifacts
+  mcImage:
+    repository: minio/mc
+    tag: RELEASE.2025-08-13T08-35-41Z
+    pullPolicy: IfNotPresent
+
+networkPolicy:
+  enabled: true
 
 resources: {}
 

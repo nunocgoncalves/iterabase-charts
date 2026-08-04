@@ -4,7 +4,8 @@ name: release
 # GitHub Release per chart tag with the packaged .tgz attached.
 # Triggered by per-chart tags: <chart-name>-<semver>, e.g.
 #   iterabase-platform-0.1.0, inference-gateway-0.1.0, control-plane-0.1.0
-# The umbrella is packaged with dependencies baked in (helm dependency build first).
+# The platform tag also publishes its same-version cert-manager-substrate companion.
+# Charts are packaged with dependencies baked in (helm dependency build first).
 # Data-dep subcharts (postgresql/redis/minio) are bundled only — not released.
 
 on:
@@ -52,6 +53,7 @@ jobs:
           # packages without the upstream archives.
           helm dependency build charts/control-plane
           helm dependency build charts/observability
+          helm dependency build charts/cert-manager-substrate
           helm dependency build "charts/$CHART"
       - name: package + push
         env:
@@ -59,6 +61,9 @@ jobs:
           VERSION: ${{ steps.tag.outputs.version }}
         run: |
           helm package "charts/$CHART" --version "$VERSION" --destination .cr-release
+          if [ "$CHART" = "iterabase-platform" ]; then
+            helm package charts/cert-manager-substrate --version "$VERSION" --destination .cr-release
+          fi
           echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
           for pkg in .cr-release/*.tgz; do
             helm push "$pkg" "oci://ghcr.io/${{ github.repository_owner }}/iterabase-charts"

@@ -17,9 +17,6 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: observability-prometheus-tls
-  annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "20"
   labels:
     {{- include "observability.labels" . | nindent 4 }}
 spec:
@@ -39,9 +36,6 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: observability-alertmanager-tls
-  annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "20"
   labels:
     {{- include "observability.labels" . | nindent 4 }}
 spec:
@@ -61,9 +55,6 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: observability-grafana-tls
-  annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "20"
   labels:
     {{- include "observability.labels" . | nindent 4 }}
 spec:
@@ -83,9 +74,6 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: observability-loki-tls
-  annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "20"
   labels:
     {{- include "observability.labels" . | nindent 4 }}
 spec:

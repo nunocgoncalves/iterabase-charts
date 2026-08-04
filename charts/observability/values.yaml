@@ -7,6 +7,13 @@ enabled: true
 tls:
   issuerName: internal-ca
 
+# Cross-release scrape contract for the companion cert-manager substrate. The
+# release defaults to <platform-release>-cert-manager in the same namespace.
+certManager:
+  metrics:
+    enabled: true
+  releaseName: ""
+
 # --- Prometheus / Grafana / Alertmanager (kube-prometheus-stack) ---
 # The stack is configured here as the platform default: PV-backed Prometheus +
 # Alertmanager + Grafana, the operator's CRDs, node-exporter + kube-state-metrics

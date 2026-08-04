@@ -10,16 +10,6 @@ apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: {{ $bootstrap | quote }}
-  annotations:
-    # Pre-install/pre-upgrade hook so the CA exists BEFORE the TLS workloads are
-    # created. The workloads mount leaf Secrets that cert-manager issues from
-    # this CA, and `helm upgrade --install --wait` blocks on those pods being
-    # Ready. A post-install hook would deadlock: the pods wait on Secrets that
-    # are only created after `--wait` succeeds. cert-manager (CRDs + controller)
-    # is a pre-existing cluster prerequisite; this hook only orders CA creation
-    # ahead of the workloads so issuance can proceed in parallel with startup.
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "10"
   labels:
     {{- include "cert-issuers.labels" . | nindent 4 }}
 spec:
@@ -32,9 +22,6 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: {{ $caSecret | quote }}
-  annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "11"
   labels:
     {{- include "cert-issuers.labels" . | nindent 4 }}
 spec:
@@ -52,9 +39,6 @@ apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: {{ .Values.internal.ca.name | quote }}
-  annotations:
-    helm.sh/hook: pre-install,pre-upgrade
-    helm.sh/hook-weight: "12"
   labels:
     {{- include "cert-issuers.labels" . | nindent 4 }}
 spec:

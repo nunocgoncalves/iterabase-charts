@@ -48,9 +48,9 @@ inference-gateway:
     # gateway.opo1.example.com) alongside letsencrypt-prod + external-dns.
     host: gateway.iterabase.local
     tls:
-      # Public HTTPS edge via cert-manager. The umbrella enables cert-manager +
-      # cert-issuers by default; clusterIssuer references cert-issuers' self-signed
-      # issuer (kind/E2E). Set clusterIssuer=letsencrypt-prod in the prod overlay.
+      # Public HTTPS edge via the prerequisite cert-manager substrate. This
+      # chart enables cert-issuers; clusterIssuer references its self-signed
+      # issuer (kind/E2E). Set letsencrypt-prod in the prod overlay.
       enabled: true
       clusterIssuer: selfsigned # cert-issuers.selfSigned.name
 control-plane:
@@ -134,31 +134,9 @@ metallb-config:
   # must match ingress-nginx.controller.service.ipFamilies.
   addresses: []
 
-# --- cert-manager (edge TLS + workload identity issuance) ---
-# cert-manager is the TLS operator (jetstack chart). The public/internal issuer
-# CRs it reconciles live in the `cert-issuers` subchart; control-plane creates
-# the platform-spiffe-ca ClusterIssuer for AgentPool worker leaves. Disable the
-# operator and CSI driver only when no chart-managed TLS or AgentPool workload
-# identity is needed. Enable `cert-issuers.letsencrypt` in the prod overlay
-# (email + Cloudflare token-ref).
-cert-manager:
-  enabled: true
-  crds:
-    enabled: true
-  # Metrics + ServiceMonitor (native to the cert-manager chart). Flip on with
-  # observability; off by default to keep the default render lean.
-  prometheus:
-    servicemonitor:
-      enabled: false
-
-# Node-local issuer used by every AgentPool pod's csi.cert-manager.io volume.
-# Pin and deploy it with the umbrella (under the same cert-manager.enabled
-# condition) so workers do not depend on an unrecorded cluster prerequisite.
-# Standalone control-plane installs must provide the same driver first.
-cert-manager-csi-driver:
-  metrics:
-    podmonitor:
-      enabled: false
+# cert-manager and its CSI driver are cluster substrate. Install the companion
+# cert-manager-substrate release and wait for its webhook before this chart.
+# Forge enforces that ordering using the same platform version.
 
 cert-issuers:
   enabled: true

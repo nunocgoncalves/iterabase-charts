@@ -1,12 +1,13 @@
 # iterabase-charts
 
-Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella chart `iterabase-platform` deploys the platform (inference-gateway + control-plane + Postgres/Redis/MinIO + ingress-nginx + MetalLB + cert-manager/CSI + external-dns) and is a **standalone artifact** — install it with `helm` directly, Flux, Argo, or via [forge](https://github.com/nunocgoncalves/forge).
+Helm charts for the [iterabase](https://iterabase.com) platform. The `cert-manager-substrate` release establishes certificate CRDs, webhook, controller, and CSI driver before the `iterabase-platform` umbrella deploys application workloads. [Forge](https://github.com/nunocgoncalves/forge) enforces this release ordering automatically; direct Helm users install the two same-version artifacts in order.
 
 ## Charts
 
 | Chart | Description | Released individually |
 |---|---|---|
-| `iterabase-platform` | Umbrella — composes all components | ✅ |
+| `cert-manager-substrate` | Ordered certificate operator, CRDs, webhook, and CSI substrate | ✅, alongside platform |
+| `iterabase-platform` | Application umbrella — composes all platform components | ✅ |
 | `inference-gateway` | Model-access service | ✅ |
 | `control-plane` | Durable workflow/control APIs, operator, and immutable artifact service | ✅ |
 | `postgresql` | Self-contained Postgres on the official image | bundled only |
@@ -20,15 +21,19 @@ control-plane ships standalone and is enabled in the umbrella by default (it pro
 
 ## Install
 
-The gateway is the only public endpoint, served over HTTPS by the bundled edge
-(ingress-nginx + cert-manager). The edge is always a **LoadBalancer** Service —
+Install the same-version certificate substrate first and wait for its webhook;
+then install the platform. The gateway is the only public endpoint, served over
+HTTPS by the platform edge (ingress-nginx + cert-manager-issued leaves). The
+edge is always a **LoadBalancer** Service —
 no hostNetwork. The LB implementation is pluggable:
 
 - **kind/dev** — MetalLB L2 with a pool in the kind docker-bridge subnet. Clone
   this repo and use the `values-kind.yaml` preset:
   ```sh
-  helm install iterabase charts/iterabase-platform -n iterabase-system --create-namespace \
-    -f values-kind.yaml --wait
+  helm install iterabase-cert-manager charts/cert-manager-substrate \
+    -n iterabase-system --create-namespace --wait
+  helm install iterabase charts/iterabase-platform -n iterabase-system \
+    -f values-kind.yaml --set control-plane.toolRunner.enabled=false --wait
   ```
   then curl the self-signed edge:
   ```sh
@@ -52,8 +57,11 @@ Production (OPO1, IPv6-only origin + Cloudflare-proxied dual-stack) — override
 your values/overlay:
 
 ```sh
+helm install iterabase-cert-manager \
+  oci://ghcr.io/nunocgoncalves/iterabase-charts/cert-manager-substrate \
+  --version 0.3.0 -n iterabase-system --create-namespace --wait
 helm install iterabase oci://ghcr.io/nunocgoncalves/iterabase-charts/iterabase-platform \
-  --version 0.1.13 -n iterabase-system --create-namespace \
+  --version 0.3.0 -n iterabase-system \
   --set inference-gateway.ingress.host=gateway.opo1.example.com \
   --set inference-gateway.ingress.tls.clusterIssuer=letsencrypt-prod \
   --set ingress-nginx.controller.service.ipFamilyPolicy=SingleStack \
@@ -91,6 +99,13 @@ Defaults retain at most eight generations / 512 MiB and drain old pins for up to
 24 hours. Invalid revisions leave the last valid generation serving. Product and
 client bundle authoring is documented in the overlay's `tools/README.md`.
 
+A valid, Ready Flux `GitRepository` named `overlay` must exist before installing
+with the runner enabled because readiness intentionally requires a validated
+first generation. Forge establishes and gates on the exact source revision and
+digest before Helm. Generic chart-only CI disables the runner because it has no
+cross-repository runner image or Flux source; the dedicated kind+Flux contract
+covers the enabled runtime path.
+
 ## Immutable artifacts
 
 The MinIO chart provisions `iterabase-artifacts` plus a dedicated bucket-scoped
@@ -115,7 +130,7 @@ helm repo add jetstack https://charts.jetstack.io
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
 ```
 
-`make build-deps` resolves the umbrella's local + `ingress-nginx` + `metallb` + `cert-manager` + `cert-manager-csi-driver` (jetstack) + `external-dns` + `reloader` (stakater) + `kube-prometheus-stack` + `loki` (grafana) dependencies.
+`make build-deps` resolves the platform's local and upstream dependencies plus the companion substrate's pinned `cert-manager` and `cert-manager-csi-driver` charts. The substrate contains no cert-manager custom resources, so Helm can establish and wait for the operator before the platform release submits issuers and Certificates.
 
 ## Observability (HOR-408)
 

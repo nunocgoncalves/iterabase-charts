@@ -1,6 +1,7 @@
 {{- if and .Values.enabled .Values.gateway.enabled .Values.gateway.tls.generated }}
 {{- $caName := include "control-plane.gatewayCASecretName" . }}
 {{- $tlsName := include "control-plane.gatewayTLSSecretName" . }}
+{{- $clusterResourceNamespace := default .Release.Namespace .Values.gateway.tls.clusterResourceNamespace }}
 {{- $existingCA := lookup "v1" "Secret" .Release.Namespace $caName }}
 {{- $ca := genCA (printf "%s platform workload CA" .Release.Name) 3650 }}
 {{- if $existingCA }}
@@ -24,15 +25,16 @@ data:
   tls.crt: {{ $ca.Cert | b64enc | quote }}
   tls.key: {{ $ca.Key | b64enc | quote }}
 {{- end }}
+{{- if ne $clusterResourceNamespace .Release.Namespace }}
 ---
-# cert-manager resolves ClusterIssuer CA Secrets from its cluster-resource
-# namespace, not the workload namespace. Mirror the same stable keypair there;
-# gateway workloads continue mounting the release-namespace copy.
+# A ClusterIssuer resolves CA Secrets from cert-manager's configured
+# cluster-resource namespace. Standalone installs can mirror the stable CA
+# there; umbrella installs use the release namespace and need no duplicate.
 apiVersion: v1
 kind: Secret
 metadata:
   name: {{ $caName }}
-  namespace: cert-manager
+  namespace: {{ $clusterResourceNamespace }}
   labels:
     {{- include "control-plane.labels" . | nindent 4 }}
     app.kubernetes.io/component: gateway-ca
@@ -42,6 +44,7 @@ data:
   ca.crt: {{ $ca.Cert | b64enc | quote }}
   tls.crt: {{ $ca.Cert | b64enc | quote }}
   tls.key: {{ $ca.Key | b64enc | quote }}
+{{- end }}
 ---
 {{- $existingTLS := lookup "v1" "Secret" .Release.Namespace $tlsName }}
 {{- $gatewayName := include "control-plane.gatewayName" . }}

@@ -25,6 +25,24 @@ data:
   tls.key: {{ $ca.Key | b64enc | quote }}
 {{- end }}
 ---
+# cert-manager resolves ClusterIssuer CA Secrets from its cluster-resource
+# namespace, not the workload namespace. Mirror the same stable keypair there;
+# gateway workloads continue mounting the release-namespace copy.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $caName }}
+  namespace: cert-manager
+  labels:
+    {{- include "control-plane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway-ca
+    app.kubernetes.io/part-of: platform-workload-pki
+type: kubernetes.io/tls
+data:
+  ca.crt: {{ $ca.Cert | b64enc | quote }}
+  tls.crt: {{ $ca.Cert | b64enc | quote }}
+  tls.key: {{ $ca.Key | b64enc | quote }}
+---
 {{- $existingTLS := lookup "v1" "Secret" .Release.Namespace $tlsName }}
 {{- $gatewayName := include "control-plane.gatewayName" . }}
 {{- $dnsNames := list $gatewayName (printf "%s.%s" $gatewayName .Release.Namespace) (printf "%s.%s.svc" $gatewayName .Release.Namespace) (printf "%s.%s.svc.cluster.local" $gatewayName .Release.Namespace) }}
@@ -54,12 +72,6 @@ apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
   name: platform-spiffe-ca
-  annotations:
-    # The umbrella installs cert-manager in the same release. Delay this CR
-    # until its CRD and webhook are established; the gateway server certificate
-    # itself is already signed from the stable chart-generated CA above.
-    helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "20"
   labels:
     {{- include "control-plane.labels" . | nindent 4 }}
     app.kubernetes.io/component: gateway-ca

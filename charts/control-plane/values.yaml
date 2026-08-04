@@ -2,7 +2,7 @@ enabled: true # standalone install renders everything; the umbrella toggles this
 
 image:
   repository: ghcr.io/nunocgoncalves/control-plane
-  tag: "0.0.18"
+  tag: "0.0.19"
   pullPolicy: IfNotPresent
 
 # One image, three Deployments selected via command (see control-plane Dockerfile).
@@ -33,6 +33,28 @@ gateway:
     serverSecret: "" # default: <release>-control-plane-gateway-tls
     clientCASecret: "" # default: <release>-control-plane-gateway-ca
   resources: {}
+
+toolRunner:
+  enabled: false # umbrella enables; requires gateway + Flux GitRepository
+  image:
+    repository: ghcr.io/nunocgoncalves/control-plane-tool-runner
+    tag: "0.0.19"
+    pullPolicy: IfNotPresent
+  runnerId: overlay-tools
+  # Exact first segment(s) of dotted tool names this reviewed runner may publish.
+  # No wildcard/empty approval is accepted. Client overlays add namespaces here.
+  allowedToolNamespaces: [platform]
+  flux:
+    namespace: flux-system
+    sourceName: overlay
+    pollMs: 5000
+    maxArchiveBytes: 536870912
+  concurrency: 8
+  maxGenerations: 8
+  maxLoadedBytes: 536870912
+  drainMaxAge: 24h
+  resources: {}
+  materializerResources: {}
 
 # Immutable artifact service (HOR-399). The umbrella's MinIO subchart creates
 # the bucket + dedicated credential. For standalone/BYO MinIO, override endpoint

@@ -71,6 +71,22 @@ helm install iterabase oci://ghcr.io/nunocgoncalves/iterabase-charts/iterabase-p
 provisioned out-of-band — see the umbrella `values.yaml` comments. For IPv4-first
 clients, set `ipFamilies[0]=IPv4` and an IPv4 `metallb-config.addresses` pool.)
 
+## Flux-backed gateway tool runner
+
+The control-plane chart can deploy the HOR-397 Node 24 runner as a two-container
+pod. Its materializer receives a projected, read-only Kubernetes token limited
+to `get` on the configured Flux `GitRepository`; the runner receives the mTLS
+SPIFFE leaf but no Kubernetes or Git credential. The materializer verifies the
+exact Flux artifact digest and writes immutable generation directories. The
+runner mounts those files read-only, validates all manifests/bundles atomically,
+and connects outbound to the tool gateway—there is no inbound runner endpoint.
+
+Configure exact dotted tool-name namespaces through
+`control-plane.toolRunner.allowedToolNamespaces`; wildcards are not supported.
+Defaults retain at most eight generations / 512 MiB and drain old pins for up to
+24 hours. Invalid revisions leave the last valid generation serving. Product and
+client bundle authoring is documented in the overlay's `tools/README.md`.
+
 ## Immutable artifacts
 
 The MinIO chart provisions `iterabase-artifacts` plus a dedicated bucket-scoped

@@ -10,6 +10,14 @@ data:
   gateway.yaml: |
     gateway:
       inline_limit: {{ .Values.gateway.inlineLimit }}
+      {{- if .Values.toolRunner.enabled }}
+      approved_runners:
+        - namespace: {{ .Release.Namespace | quote }}
+          runner_id: {{ .Values.toolRunner.runnerId | quote }}
+          spiffe_id: {{ printf "spiffe://%s/tool-runners/%s/%s" .Values.gateway.trustDomain .Release.Namespace .Values.toolRunner.runnerId | quote }}
+          allowed_tool_namespaces:
+            {{- toYaml (required "toolRunner.allowedToolNamespaces is required" .Values.toolRunner.allowedToolNamespaces) | nindent 12 }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

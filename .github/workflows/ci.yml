@@ -33,6 +33,31 @@ jobs:
       - name: check-tls (static render + kubeconform with internal TLS on)
         run: make check-tls
 
+  certificate-ownership-migration:
+    # Platform <=0.2.2 owned cert-manager/CSI inside the umbrella release. Prove
+    # the 0.3.0 platform-first hand-off and inverse rollback against the actual
+    # released chart so fresh-install-only CI cannot hide Helm ownership clashes.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: azure/setup-helm@v4
+      - uses: helm/kind-action@v1
+        with:
+          version: v0.24.0
+      - name: helm repo add external chart repositories
+        run: |
+          helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+          helm repo add metallb https://metallb.github.io/metallb
+          helm repo add jetstack https://charts.jetstack.io
+          helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+          helm repo add stakater https://stakater.github.io/stakater-charts
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo add grafana https://grafana.github.io/helm-charts
+      - name: build local 0.3.0 chart dependencies
+        run: make build-deps
+      - name: validate 0.2.2 ownership hand-off and rollback
+        run: ./scripts/check-certificate-migration.sh
+
   install:
     runs-on: ubuntu-latest
     steps:

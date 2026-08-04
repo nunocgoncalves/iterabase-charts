@@ -9,7 +9,12 @@ render=$(helm template runner-check charts/control-plane \
 
 grep -q 'app.kubernetes.io/component: tool-runner' <<<"$render"
 grep -q 'spiffe://iterabase.local/tool-runners/default/overlay-tools' <<<"$render"
-grep -q 'resourceNames: \["overlay"\]' <<<"$render"
+flux_rbac=$(awk '/# The materializer polls one exact GitRepository/{p=1} /^apiVersion: cert-manager.io/{p=0} p' <<<"$render")
+grep -q '^kind: Role$' <<<"$flux_rbac"
+grep -q '^kind: RoleBinding$' <<<"$flux_rbac"
+grep -q '^  namespace: "flux-system"$' <<<"$flux_rbac"
+grep -q 'resourceNames: \["overlay"\]' <<<"$flux_rbac"
+! grep -q '^kind: ClusterRole' <<<"$flux_rbac"
 grep -q 'mountPath: /artifacts, readOnly: true' <<<"$render"
 grep -q 'name: TOOL_RUNNER_MAX_GENERATIONS' <<<"$render"
 grep -q 'name: TOOL_RUNNER_DRAIN_MAX_AGE' <<<"$render"
@@ -27,5 +32,6 @@ grep -q 'name: kube-api' <<<"$materializer"
 ! grep -q 'name: runner-tls' <<<"$materializer"
 grep -q 'name: runner-tls' <<<"$runner"
 ! grep -q 'name: kube-api' <<<"$runner"
+grep -q 'rm -f /control/runner-ready; exec node /app/dist/main.js run' <<<"$runner"
 
-echo "OK: tool runner renders with exact SPIFFE approval, bounded generations, read-only artifacts, split credentials, and Prometheus scraping"
+echo "OK: tool runner renders with exact SPIFFE/Flux scoping, process-lifetime readiness, bounded generations, read-only artifacts, split credentials, and Prometheus scraping"

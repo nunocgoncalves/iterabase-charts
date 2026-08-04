@@ -5,10 +5,12 @@ assert_service_selector() {
   local chart="$1"
   local template="$2"
   local expected="$3"
+  shift 3
   local rendered actual
 
   rendered=$(helm template selector-check "charts/$chart" \
     --set metrics.enabled=true \
+    "$@" \
     --show-only "templates/$template")
   actual=$(awk '
     /^kind: Service$/ { service = 1; spec = 0; selector = 0; next }
@@ -28,3 +30,4 @@ assert_service_selector postgresql service.yaml database
 assert_service_selector postgresql exporter.yaml exporter
 assert_service_selector redis service.yaml cache
 assert_service_selector redis exporter.yaml exporter
+assert_service_selector control-plane gateway.yaml gateway --set gateway.enabled=true

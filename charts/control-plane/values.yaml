@@ -5,9 +5,10 @@ image:
   tag: "0.0.18"
   pullPolicy: IfNotPresent
 
-# One image, two Deployments selected via command (see control-plane Dockerfile).
+# One image, three Deployments selected via command (see control-plane Dockerfile).
 #   manager: ["/manager"]                — controller-runtime operator
-#   api:     ["/api","serve"]            — HTTP API (JWKS, /v1/token, admin CRUD)
+#   api:     ["/api","serve"]            — HTTP API (JWKS, work, artifacts)
+#   gateway: ["/gateway","serve"]        — mTLS workload/tool/artifact gRPC
 # migrate + bootstrap run as RBAC-less init containers on the api Deployment.
 manager:
   args:
@@ -15,6 +16,22 @@ manager:
   resources: {}
 api:
   addr: ":8080"
+  resources: {}
+
+gateway:
+  # Standalone installs opt in after providing cert-manager and either using
+  # generated TLS or supplying serverSecret + clientCASecret with generated=false.
+  # The umbrella enables the gateway and generated platform CA by default.
+  enabled: false
+  addr: ":8090"
+  service:
+    port: 8090
+  trustDomain: iterabase.local
+  inlineLimit: 65536
+  tls:
+    generated: true
+    serverSecret: "" # default: <release>-control-plane-gateway-tls
+    clientCASecret: "" # default: <release>-control-plane-gateway-ca
   resources: {}
 
 # Immutable artifact service (HOR-399). The umbrella's MinIO subchart creates

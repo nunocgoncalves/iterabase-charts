@@ -122,36 +122,7 @@ spec:
               value: {{ .Values.jwt.keyId | quote }}
             - name: IDENTITY_MODE
               value: {{ .Values.identity.mode | quote }}
-            - name: ARTIFACT_ENABLED
-              value: {{ .Values.artifact.enabled | quote }}
-            {{- if .Values.artifact.enabled }}
-            - name: ARTIFACT_ENDPOINT
-              value: {{ include "control-plane.artifactEndpoint" . | quote }}
-            - name: ARTIFACT_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "control-plane.artifactSecretName" . }}
-                  key: accessKey
-            - name: ARTIFACT_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "control-plane.artifactSecretName" . }}
-                  key: secretKey
-            - name: ARTIFACT_BUCKET
-              value: {{ .Values.artifact.bucket | quote }}
-            - name: ARTIFACT_SECURE
-              value: {{ .Values.artifact.secure | quote }}
-            - name: ARTIFACT_MAX_SIZE_BYTES
-              value: {{ .Values.artifact.maxSizeBytes | quote }}
-            {{- with .Values.artifact.defaultRetention }}
-            - name: ARTIFACT_DEFAULT_RETENTION
-              value: {{ . | quote }}
-            {{- end }}
-            - name: ARTIFACT_PENDING_TTL
-              value: {{ .Values.artifact.pendingTTL | quote }}
-            - name: ARTIFACT_SWEEP_INTERVAL
-              value: {{ .Values.artifact.sweepInterval | quote }}
-            {{- end }}
+            {{- include "control-plane.artifactEnv" . | nindent 12 }}
             - name: LOG_LEVEL
               value: {{ .Values.logLevel | default "info" | quote }}
             - name: LOG_FORMAT

@@ -1,7 +1,7 @@
 {{- if .Values.enabled }}
 {{- if .Values.metrics.enabled }}
 {{- $tls := (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
-{{- $auth := (or .Values.auth.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+{{- $auth := eq (include "redis.authEnabled" .) "true" }}
 {{- $caSecret := (printf "%s-internal-ca-root" .Release.Name) }}
 {{- $name := (printf "%s-redis-exporter" .Release.Name) }}
 # redis-exporter: standalone Deployment + Service + ServiceMonitor. Separate pod

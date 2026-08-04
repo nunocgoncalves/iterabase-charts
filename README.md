@@ -77,8 +77,8 @@ The MinIO chart provisions `iterabase-artifacts` plus a dedicated bucket-scoped
 credential consumed only by the control-plane API/gateway. Sandboxes and tool
 runners have no object-store credential or direct route. Retention is indefinite
 unless `control-plane.artifact.defaultRetention` is configured. See
-[`docs/artifact-operations.md`](docs/artifact-operations.md) for round-trip,
-delete, and manual backup/restore validation.
+[`docs/artifact-operations.md`](docs/artifact-operations.md) for round-trip and
+explicit deletion validation.
 
 ## Develop
 

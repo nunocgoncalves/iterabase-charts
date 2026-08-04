@@ -55,38 +55,3 @@ curl -fsS -X DELETE -H "Authorization: Bearer $ADMIN_API_KEY" \
 
 A subsequent work-scope `GET` must return `410 Gone`. Retention expiry uses the
 same lifecycle automatically. `retention_until = NULL` means indefinite.
-
-## Manual backup/restore validation
-
-HOR-399 does **not** add a backup system. OPO1 validation uses the existing
-Postgres and MinIO tools with an operator-controlled, encrypted backup mount.
-Do not send customer data to an unapproved cloud destination.
-
-1. Quiesce artifact writers by scaling the control-plane API and gateway to
-   zero during the maintenance window.
-2. Run `pg_dump --format=custom` against the control-plane database.
-3. Run `mc mirror --preserve local/iterabase-artifacts /backup/artifacts` from a
-   temporary operator pod that mounts the approved backup filesystem. Give that
-   pod the release's `app.kubernetes.io/name=minio`,
-   `app.kubernetes.io/instance=<release>`, and
-   `app.kubernetes.io/component=artifact-backup` labels so the MinIO
-   NetworkPolicy admits it; delete the pod and its temporary credential mount
-   when validation finishes.
-4. Save a manifest containing artifact ID, object key, size, and canonical
-   SHA-256 digest from Postgres; hash every mirrored file and compare it.
-5. Restore into empty Postgres/MinIO storage in a validation namespace, rerun
-   the manifest comparison, and retrieve a representative artifact through the
-   control-plane API.
-6. Resume writers only after backup or restore verification succeeds.
-
-Example tool operations (credentials supplied through temporary Secret refs,
-never command-line literals):
-
-```sh
-pg_dump "$DATABASE_URL" --format=custom --file=/backup/control-plane.dump
-mc alias set local "$MINIO_ENDPOINT" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"
-mc mirror --preserve local/iterabase-artifacts /backup/artifacts
-```
-
-Backup destination, encryption, schedule, transfer, and retention are defined
-by the OPO1/customer data agreement, not by this chart.

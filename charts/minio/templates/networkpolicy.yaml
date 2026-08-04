@@ -29,13 +29,6 @@ spec:
               - key: app.kubernetes.io/component
                 operator: In
                 values: [api, gateway]
-        # Temporary operator backup pods must opt into this narrowly scoped
-        # route. Credentials remain a separate Secret-gated control.
-        - podSelector:
-            matchLabels:
-              app.kubernetes.io/name: minio
-              app.kubernetes.io/instance: {{ .Release.Name }}
-              app.kubernetes.io/component: artifact-backup
         {{- if .Values.metrics.enabled }}
         - podSelector:
             matchLabels:

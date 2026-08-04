@@ -4,7 +4,7 @@
 {{- $existingCA := lookup "v1" "Secret" .Release.Namespace $caName }}
 {{- $ca := genCA (printf "%s platform workload CA" .Release.Name) 3650 }}
 {{- if $existingCA }}
-{{- $ca = buildCustomCert (index $existingCA.data "tls.crt" | b64dec) (index $existingCA.data "tls.key" | b64dec) }}
+{{- $ca = buildCustomCert (index $existingCA.data "tls.crt") (index $existingCA.data "tls.key") }}
 {{- end }}
 apiVersion: v1
 kind: Secret

@@ -251,6 +251,8 @@ jobs:
           wait_pods "app.kubernetes.io/name=redis,app.kubernetes.io/component=exporter"
           echo "all observability targets ready"
           kubectl get pods -n "$ns" -o wide | grep -E "prometheus|grafana|loki|alertmanager|promtail|exporter" || true
+      - name: assert data and exporter EndpointSlices are disjoint
+        run: python3 scripts/assert-service-endpoints.py
       - name: helm test (runs the chart's helm tests)
         run: helm test iterabase -n iterabase-system --timeout 5m
       - name: assert Prometheus PV-backed data persists across pod restart
@@ -482,6 +484,9 @@ jobs:
           assert_https iterabase-grafana 3000 80 /api/health
           assert_https iterabase-loki 3100 3100 /ready
           echo "all four observability stack components serve HTTPS over internal TLS"
+
+      - name: assert TLS data and exporter EndpointSlices are disjoint
+        run: python3 scripts/assert-service-endpoints.py
 
       - name: assert TLS client paths (Promtail → Loki + Prometheus → Alertmanager)
         run: |

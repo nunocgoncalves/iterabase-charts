@@ -14,14 +14,18 @@ kubectl -n <namespace> wait --for=condition=complete job \
 kubectl -n <namespace> get secret <release>-minio-artifacts
 kubectl -n <namespace> rollout status deployment/<release>-control-plane-api
 kubectl -n <namespace> rollout status deployment/<release>-control-plane-gateway
+kubectl -n <namespace> rollout status daemonset/cert-manager-csi-driver
+kubectl get csidriver csi.cert-manager.io
+kubectl wait --for=condition=Ready clusterissuer/platform-spiffe-ca --timeout=2m
 ```
 
 The workload ArtifactService is available only through the mandatory-mTLS
 `<release>-control-plane-gateway:8090` Service. AgentPools use that Service as
 their `toolGateway`, trust the chart-generated
 `<release>-control-plane-gateway-ca`, and receive leaves from the
-`platform-spiffe-ca` ClusterIssuer. The gateway and API mount the bucket-scoped
-artifact Secret; supervisors mount only their workload leaf and CA chain.
+`platform-spiffe-ca` ClusterIssuer through the umbrella's pinned
+`cert-manager-csi-driver`. The gateway and API mount the bucket-scoped artifact
+Secret; supervisors mount only their workload leaf and CA chain.
 
 Validate through the artifact API rather than MinIO:
 

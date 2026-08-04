@@ -6,6 +6,14 @@
 {{- printf "%s-redis" .Release.Name -}}
 {{- end -}}
 
+{{- /* redis.authEnabled is the authoritative effective-AUTH predicate. The
+     umbrella's internal-TLS mode pairs TLS with AUTH; standalone charts can
+     still enable AUTH independently. Consumers compare this rendered boolean
+     explicitly because a rendered "false" string is truthy in Go templates. */ -}}
+{{- define "redis.authEnabled" -}}
+{{- or .Values.auth.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict))) -}}
+{{- end -}}
+
 {{- define "redis.labels" -}}
 app.kubernetes.io/name: redis
 app.kubernetes.io/instance: {{ .Release.Name }}
@@ -21,7 +29,7 @@ app.kubernetes.io/component: cache
 {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) -}}
 {{- $parts = concat $parts (list "--tls-port" "6379" "--port" "0" "--tls-cert-file" "/tls/tls.crt" "--tls-key-file" "/tls/tls.key" "--tls-auth-clients" "no") -}}
 {{- end -}}
-{{- if (or .Values.auth.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) -}}
+{{- if eq (include "redis.authEnabled" .) "true" -}}
 {{- $parts = concat $parts (list "--requirepass" (printf "%q" "$REDIS_PASSWORD")) -}}
 {{- end -}}
 {{- join " " $parts -}}
@@ -35,7 +43,7 @@ app.kubernetes.io/component: cache
 {{- if (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) -}}
 {{- $parts = concat $parts (list "--tls" "--insecure") -}}
 {{- end -}}
-{{- if (or .Values.auth.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) -}}
+{{- if eq (include "redis.authEnabled" .) "true" -}}
 {{- $parts = concat $parts (list "-a" (printf "%q" "$REDIS_PASSWORD")) -}}
 {{- end -}}
 {{- $parts = concat $parts (list "ping") -}}

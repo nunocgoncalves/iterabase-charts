@@ -1,4 +1,5 @@
 {{- if .Values.enabled }}
+{{- $auth := eq (include "redis.authEnabled" .) "true" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -42,7 +43,7 @@ spec:
         - name: redis
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if or (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) .Values.auth.enabled }}
+          {{- if or (or .Values.tls.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) $auth }}
           # sh -c so $REDIS_PASSWORD is expanded at runtime (not baked into the
           # chart). With neither flag, the image default `redis-server` runs.
           command:
@@ -51,7 +52,7 @@ spec:
             - {{ include "redis.startCommand" . | quote }}
           {{- end }}
           env:
-            {{- if (or .Values.auth.enabled (dig "internalTLS" "enabled" false (.Values.global | default (dict)))) }}
+            {{- if $auth }}
             - name: REDIS_PASSWORD
               valueFrom:
                 secretKeyRef:

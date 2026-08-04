@@ -34,13 +34,14 @@ spec:
       targetPort: run-metrics
 {{- end }}
 ---
-# The materializer polls one exact GitRepository by name. The ClusterRole is
-# resource-name constrained because the source lives in flux-system while the
-# runner remains in the platform release namespace.
+# The materializer polls one exact GitRepository by name in one exact Flux
+# namespace. Keep both constraints in a namespaced Role: resourceNames alone
+# would authorize a same-named source in every namespace through a ClusterRole.
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
+kind: Role
 metadata:
   name: {{ $name }}
+  namespace: {{ .Values.toolRunner.flux.namespace | quote }}
   labels:
     {{- include "control-plane.labels" . | nindent 4 }}
     app.kubernetes.io/component: tool-materializer
@@ -51,15 +52,16 @@ rules:
     verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
+kind: RoleBinding
 metadata:
   name: {{ $name }}
+  namespace: {{ .Values.toolRunner.flux.namespace | quote }}
   labels:
     {{- include "control-plane.labels" . | nindent 4 }}
     app.kubernetes.io/component: tool-materializer
 roleRef:
   apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
+  kind: Role
   name: {{ $name }}
 subjects:
   - kind: ServiceAccount
@@ -157,7 +159,11 @@ spec:
         - name: runner
           image: "{{ .Values.toolRunner.image.repository }}:{{ .Values.toolRunner.image.tag }}"
           imagePullPolicy: {{ .Values.toolRunner.image.pullPolicy }}
-          args: ["run"]
+          # /control is pod-scoped and survives a container restart. Clear the
+          # prior process's marker before exec so readiness is process-lifetime
+          # state and stays false until this runner validates a generation.
+          command: ["/bin/sh", "-ec"]
+          args: ["rm -f /control/runner-ready; exec node /app/dist/main.js run"]
           env:
             - {name: TOOL_GATEWAY_URL, value: {{ printf "https://%s:%v" (include "control-plane.gatewayName" .) .Values.gateway.service.port | quote }}}
             - {name: TOOL_GATEWAY_SERVER_NAME, value: {{ include "control-plane.gatewayName" . | quote }}}

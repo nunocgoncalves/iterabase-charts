@@ -79,6 +79,61 @@ helm install iterabase oci://ghcr.io/nunocgoncalves/iterabase-charts/iterabase-p
 provisioned out-of-band — see the umbrella `values.yaml` comments. For IPv4-first
 clients, set `ipFamilies[0]=IPv4` and an IPv4 `metallb-config.addresses` pool.)
 
+### Upgrade from platform 0.2.2 or earlier
+
+Platform 0.2.2 bundled cert-manager and the CSI driver in the platform Helm
+release. **Do not install the companion substrate first** on an existing
+installation: its resources intentionally have the same names, and Helm will
+reject the second release's ownership metadata. Use this staged hand-off, with
+the deployment's normal values arguments in both platform upgrades:
+
+```sh
+platform_values=(-f /path/to/current-values.yaml) # add the deployment's usual --set options too
+
+# 1. Upgrade the old owner first. Existing certificate Secrets remain valid;
+#    defer the newly introduced runner until the substrate is restored.
+helm upgrade iterabase \
+  oci://ghcr.io/nunocgoncalves/iterabase-charts/iterabase-platform \
+  --version 0.3.0 -n iterabase-system "${platform_values[@]}" \
+  --set control-plane.toolRunner.enabled=false --wait
+
+# 2. The old chart keeps its CRDs. Transfer those six retained objects to the
+#    companion release, then install the new owner.
+cert_crds=$(kubectl get crd -l app.kubernetes.io/name=cert-manager -o name)
+kubectl annotate --overwrite $cert_crds \
+  meta.helm.sh/release-name=iterabase-cert-manager \
+  meta.helm.sh/release-namespace=iterabase-system
+helm install iterabase-cert-manager \
+  oci://ghcr.io/nunocgoncalves/iterabase-charts/cert-manager-substrate \
+  --version 0.3.0 -n iterabase-system --wait
+
+# 3. Reconcile the intended values now that the operator and CSI driver are Ready.
+helm upgrade iterabase \
+  oci://ghcr.io/nunocgoncalves/iterabase-charts/iterabase-platform \
+  --version 0.3.0 -n iterabase-system "${platform_values[@]}" --wait
+```
+
+Forge detects a pre-0.3 platform release and performs this same platform-first
+hand-off before returning to the normal substrate-first order. The companion
+release name must be `<platform-release>-cert-manager`; the examples therefore
+pair `iterabase` with `iterabase-cert-manager`.
+
+Rollback uses the inverse hand-off. First uninstall the companion release, then
+rollback the platform to its pre-0.3 revision; a direct rollback collides with
+the still-owned companion resources:
+
+```sh
+helm uninstall iterabase-cert-manager -n iterabase-system --wait
+cert_crds=$(kubectl get crd -l app.kubernetes.io/name=cert-manager -o name)
+kubectl annotate --overwrite $cert_crds \
+  meta.helm.sh/release-name=iterabase \
+  meta.helm.sh/release-namespace=iterabase-system
+helm rollback iterabase <pre-0.3-revision> -n iterabase-system --wait
+```
+
+CI exercises both directions against the released 0.2.2 chart via
+`scripts/check-certificate-migration.sh`.
+
 ## Flux-backed gateway tool runner
 
 The control-plane chart can deploy the HOR-397 Node 24 runner as a two-container

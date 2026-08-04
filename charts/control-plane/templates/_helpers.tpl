@@ -22,6 +22,14 @@
 {{- printf "%s-control-plane-gateway" .Release.Name -}}
 {{- end -}}
 
+{{- define "control-plane.toolRunnerName" -}}
+{{- printf "%s-tool-runner" .Release.Name -}}
+{{- end -}}
+
+{{- define "control-plane.toolRunnerTLSSecretName" -}}
+{{- printf "%s-tool-runner-tls" .Release.Name -}}
+{{- end -}}
+
 {{- define "control-plane.jwtSecretName" -}}
 {{- if .Values.jwt.secret -}}{{- .Values.jwt.secret -}}{{- else -}}{{- printf "%s-control-plane-jwt" .Release.Name -}}{{- end -}}
 {{- end -}}

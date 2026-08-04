@@ -57,6 +57,9 @@ control-plane:
   enabled: true # provides the shared pgvector Postgres + the schemas the gateway reads
   gateway:
     enabled: true # mTLS workload/tool/artifact service; generated CA is stable across upgrades
+  toolRunner:
+    enabled: true # Node 24 runner + exact Flux GitRepository artifact generations (HOR-397)
+    allowedToolNamespaces: [platform] # overlays add reviewed namespaces (for example graph/client)
   artifact:
     enabled: true
     endpoint: "" # default: <release>-minio:9000

@@ -32,6 +32,14 @@
 postgres://{{ .Values.postgresql.auth.username }}:$(PGPASSWORD)@{{ include "control-plane.pgHost" . }}:{{ .Values.postgresql.port }}/{{ .Values.postgresql.auth.database }}?sslmode={{ $ssl }}
 {{- end -}}
 
+{{- define "control-plane.artifactEndpoint" -}}
+{{- default (printf "%s-minio:9000" .Release.Name) .Values.artifact.endpoint -}}
+{{- end -}}
+
+{{- define "control-plane.artifactSecretName" -}}
+{{- default (printf "%s-minio-artifacts" .Release.Name) .Values.artifact.credentialSecret -}}
+{{- end -}}
+
 {{- define "control-plane.apiTLSSecretName" -}}
 {{- printf "%s-control-plane-api-tls" .Release.Name -}}
 {{- end -}}

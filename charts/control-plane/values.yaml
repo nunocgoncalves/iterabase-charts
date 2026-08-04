@@ -2,7 +2,7 @@ enabled: true # standalone install renders everything; the umbrella toggles this
 
 image:
   repository: ghcr.io/nunocgoncalves/control-plane
-  tag: "0.0.17"
+  tag: "0.0.18"
   pullPolicy: IfNotPresent
 
 # One image, two Deployments selected via command (see control-plane Dockerfile).
@@ -16,6 +16,20 @@ manager:
 api:
   addr: ":8080"
   resources: {}
+
+# Immutable artifact service (HOR-399). The umbrella's MinIO subchart creates
+# the bucket + dedicated credential. For standalone/BYO MinIO, override endpoint
+# and credentialSecret with an equivalent bucket-scoped credential.
+artifact:
+  enabled: false # umbrella enables; standalone/BYO must configure endpoint + Secret
+  endpoint: "" # default: <release>-minio:9000
+  bucket: iterabase-artifacts
+  credentialSecret: "" # default: <release>-minio-artifacts
+  secure: false
+  maxSizeBytes: 1073741824
+  defaultRetention: "" # empty = indefinite
+  pendingTTL: 1h
+  sweepInterval: 1m
 
 service:
   port: 8080

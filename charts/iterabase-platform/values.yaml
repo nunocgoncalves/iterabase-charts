@@ -24,6 +24,9 @@ redis:
     enabled: false
 minio:
   enabled: true
+  artifactService:
+    enabled: true
+    bucket: iterabase-artifacts
   # metrics.enabled (default false): a ServiceMonitor scraping MinIO's native
   # /minio/v2/metrics/cluster endpoint (no exporter needed). Flip on with
   # observability (see values-observability.yaml).
@@ -52,6 +55,12 @@ inference-gateway:
       clusterIssuer: selfsigned # cert-issuers.selfSigned.name
 control-plane:
   enabled: true # provides the shared pgvector Postgres + the schemas the gateway reads
+  artifact:
+    enabled: true
+    endpoint: "" # default: <release>-minio:9000
+    bucket: iterabase-artifacts
+    credentialSecret: "" # default: <release>-minio-artifacts
+    defaultRetention: "" # indefinite unless the data agreement sets a duration
   # metrics.enabled (default false): ServiceMonitors for the control-plane api +
   # manager + the modelbackend (vLLM) pods the operator manages. The api/manager
   # /metrics endpoints are a service-repo concern (HOR-408 tracked gap); the

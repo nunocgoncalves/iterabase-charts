@@ -8,7 +8,7 @@ Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella ch
 |---|---|---|
 | `iterabase-platform` | Umbrella — composes all components | ✅ |
 | `inference-gateway` | Model-access service | ✅ |
-| `control-plane` | Identity store + IdentityMapping operator + JWT/JWKS API | ✅ |
+| `control-plane` | Durable workflow/control APIs, operator, and immutable artifact service | ✅ |
 | `postgresql` | Self-contained Postgres on the official image | bundled only |
 | `redis` | Self-contained Redis (hot-path cache) | bundled only |
 | `minio` | Self-contained MinIO object storage | bundled only |
@@ -70,6 +70,15 @@ helm install iterabase oci://ghcr.io/nunocgoncalves/iterabase-charts/iterabase-p
 (The Cloudflare API-token Secret shared by cert-issuers + external-dns must be
 provisioned out-of-band — see the umbrella `values.yaml` comments. For IPv4-first
 clients, set `ipFamilies[0]=IPv4` and an IPv4 `metallb-config.addresses` pool.)
+
+## Immutable artifacts
+
+The MinIO chart provisions `iterabase-artifacts` plus a dedicated bucket-scoped
+credential consumed only by the control-plane API/gateway. Sandboxes and tool
+runners have no object-store credential or direct route. Retention is indefinite
+unless `control-plane.artifact.defaultRetention` is configured. See
+[`docs/artifact-operations.md`](docs/artifact-operations.md) for round-trip,
+delete, and manual backup/restore validation.
 
 ## Develop
 

@@ -1,6 +1,6 @@
 # iterabase-charts
 
-Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella chart `iterabase-platform` deploys the platform (inference-gateway + control-plane + Postgres/Redis/MinIO + ingress-nginx + MetalLB + cert-manager + external-dns) and is a **standalone artifact** — install it with `helm` directly, Flux, Argo, or via [forge](https://github.com/nunocgoncalves/forge).
+Helm charts for the [iterabase](https://iterabase.com) platform. The umbrella chart `iterabase-platform` deploys the platform (inference-gateway + control-plane + Postgres/Redis/MinIO + ingress-nginx + MetalLB + cert-manager/CSI + external-dns) and is a **standalone artifact** — install it with `helm` directly, Flux, Argo, or via [forge](https://github.com/nunocgoncalves/forge).
 
 ## Charts
 
@@ -95,7 +95,7 @@ helm repo add jetstack https://charts.jetstack.io
 helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
 ```
 
-`make build-deps` resolves the umbrella's local + `ingress-nginx` + `metallb` + `cert-manager` (jetstack) + `external-dns` + `reloader` (stakater) + `kube-prometheus-stack` + `loki` (grafana) dependencies.
+`make build-deps` resolves the umbrella's local + `ingress-nginx` + `metallb` + `cert-manager` + `cert-manager-csi-driver` (jetstack) + `external-dns` + `reloader` (stakater) + `kube-prometheus-stack` + `loki` (grafana) dependencies.
 
 ## Observability (HOR-408)
 

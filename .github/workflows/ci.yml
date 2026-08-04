@@ -92,6 +92,59 @@ jobs:
             -f /tmp/kind-edge.yaml \
             --set external-dns.enabled=false \
             --wait --timeout 12m
+      - name: validate AgentPool workload identity issuance
+        run: |
+          set -euo pipefail
+          ns=iterabase-system
+          kubectl -n "$ns" rollout status daemonset/cert-manager-csi-driver --timeout=2m
+          kubectl get csidriver csi.cert-manager.io
+          kubectl wait --for=condition=Ready clusterissuer/platform-spiffe-ca --timeout=2m
+          cat <<'EOF' | kubectl apply -n "$ns" -f -
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: workload-identity-csi-smoke
+          spec:
+            restartPolicy: Never
+            containers:
+              - name: verify
+                image: busybox:1.37.0
+                command: ["/bin/sh", "-c"]
+                args: ["test -s /tls/tls.crt && test -s /tls/tls.key && test -s /tls/ca.crt"]
+                volumeMounts:
+                  - name: workload-identity
+                    mountPath: /tls
+                    readOnly: true
+            volumes:
+              - name: workload-identity
+                csi:
+                  driver: csi.cert-manager.io
+                  readOnly: true
+                  volumeAttributes:
+                    csi.cert-manager.io/issuer-name: platform-spiffe-ca
+                    csi.cert-manager.io/issuer-kind: ClusterIssuer
+                    csi.cert-manager.io/uri-sans: spiffe://iterabase.local/pools/ci/workers/csi-smoke
+                    csi.cert-manager.io/duration: 1h
+          EOF
+          for i in $(seq 1 60); do
+            phase=$(kubectl get pod workload-identity-csi-smoke -n "$ns" -o jsonpath='{.status.phase}')
+            case "$phase" in
+              Succeeded)
+                kubectl delete pod workload-identity-csi-smoke -n "$ns" --wait=false
+                echo "cert-manager CSI issued and mounted a workload leaf"
+                exit 0
+                ;;
+              Failed)
+                break
+                ;;
+            esac
+            sleep 2
+          done
+          echo "::error::cert-manager CSI workload leaf was not mounted"
+          kubectl describe pod workload-identity-csi-smoke -n "$ns" || true
+          kubectl get certificaterequest -A -o wide || true
+          kubectl logs -n "$ns" daemonset/cert-manager-csi-driver --all-containers --tail=200 || true
+          exit 1
       - name: wait for MetalLB to assign the ingress-nginx LB IP
         run: |
           # metallb-config renders IPAddressPool + L2Advertisement as post-install

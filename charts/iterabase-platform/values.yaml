@@ -132,12 +132,13 @@ metallb-config:
   # must match ingress-nginx.controller.service.ipFamilies.
   addresses: []
 
-# --- cert-manager (edge TLS issuance) ---
-# cert-manager is the edge TLS operator (jetstack chart). The issuer CRs it
-# reconciles live in the `cert-issuers` subchart. Disable both for dev/kind
-# smoke (`--set cert-manager.enabled=false --set cert-issuers.enabled=false`);
-# enable `cert-issuers.letsencrypt` in the prod overlay (email + Cloudflare
-# token-ref).
+# --- cert-manager (edge TLS + workload identity issuance) ---
+# cert-manager is the TLS operator (jetstack chart). The public/internal issuer
+# CRs it reconciles live in the `cert-issuers` subchart; control-plane creates
+# the platform-spiffe-ca ClusterIssuer for AgentPool worker leaves. Disable the
+# operator and CSI driver only when no chart-managed TLS or AgentPool workload
+# identity is needed. Enable `cert-issuers.letsencrypt` in the prod overlay
+# (email + Cloudflare token-ref).
 cert-manager:
   enabled: true
   crds:
@@ -146,6 +147,15 @@ cert-manager:
   # observability; off by default to keep the default render lean.
   prometheus:
     servicemonitor:
+      enabled: false
+
+# Node-local issuer used by every AgentPool pod's csi.cert-manager.io volume.
+# Pin and deploy it with the umbrella (under the same cert-manager.enabled
+# condition) so workers do not depend on an unrecorded cluster prerequisite.
+# Standalone control-plane installs must provide the same driver first.
+cert-manager-csi-driver:
+  metrics:
+    podmonitor:
       enabled: false
 
 cert-issuers:

@@ -8,7 +8,7 @@ RENDER_CP := /tmp/$(CONTROLPLANE).rendered.yaml
 RENDER_TLS := /tmp/$(UMBRELLA).tls.rendered.yaml
 RENDER_OBS := /tmp/$(UMBRELLA).observability.rendered.yaml
 
-.PHONY: build-deps lint template kubeconform template-controlplane kubeconform-controlplane template-tls kubeconform-tls template-observability kubeconform-observability check-service-selectors check-redis-exporter-auth check-artifact-config check check-tls check-observability clean
+.PHONY: build-deps lint template kubeconform template-controlplane kubeconform-controlplane template-tls kubeconform-tls template-observability kubeconform-observability check-service-selectors check-redis-exporter-auth check-artifact-config check-manager-contract check check-tls check-observability clean
 
 # control-plane has its own file:// dep (postgresql) and observability has its
 # own upstream deps (kube-prometheus-stack + loki); build them first so the
@@ -62,7 +62,10 @@ check-redis-exporter-auth:
 check-artifact-config:
 	./scripts/check-artifact-config.sh
 
-check: lint kubeconform kubeconform-controlplane kubeconform-observability check-service-selectors check-redis-exporter-auth check-artifact-config
+check-manager-contract:
+	./scripts/check-manager-contract.sh
+
+check: lint kubeconform kubeconform-controlplane kubeconform-observability check-service-selectors check-redis-exporter-auth check-artifact-config check-manager-contract
 
 check-tls: kubeconform-tls check-redis-exporter-auth
 

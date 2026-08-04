@@ -92,6 +92,31 @@ jobs:
             -f /tmp/kind-edge.yaml \
             --set external-dns.enabled=false \
             --wait --timeout 12m
+      - name: validate control-plane manager CRDs, RBAC, and cache stability
+        run: |
+          set -euo pipefail
+          ns=iterabase-system
+          deployment=iterabase-control-plane-manager
+          service_account=$(kubectl -n "$ns" get deployment "$deployment" -o jsonpath='{.spec.template.spec.serviceAccountName}')
+          subject="system:serviceaccount:${ns}:${service_account}"
+
+          kubectl get crd agentpools.platform.iterabase.com workflows.platform.iterabase.com
+          for resource in pods configmaps persistentvolumeclaims networkpolicies.networking.k8s.io agentpools.platform.iterabase.com workflows.platform.iterabase.com; do
+            test "$(kubectl auth can-i list "$resource" --all-namespaces --as="$subject")" = yes
+          done
+          test "$(kubectl auth can-i get secrets -n "$ns" --as="$subject")" = yes
+
+          kubectl -n "$ns" rollout status deployment/"$deployment" --timeout=2m
+          # controller-runtime exits after its two-minute cache-sync timeout when
+          # a watched CRD or RBAC grant is absent. Stay past that boundary.
+          sleep 130
+          test "$(kubectl -n "$ns" get deployment "$deployment" -o jsonpath='{.status.readyReplicas}')" = 1
+          test "$(kubectl -n "$ns" get pods -l app.kubernetes.io/component=manager -o jsonpath='{.items[0].status.containerStatuses[0].restartCount}')" = 0
+          if kubectl -n "$ns" logs deployment/"$deployment" --all-containers | grep -q 'Failed to run manager'; then
+            echo "::error::control-plane manager exited after cache synchronization"
+            exit 1
+          fi
+          echo "control-plane manager remained ready beyond cache synchronization"
       - name: validate AgentPool workload identity issuance
         run: |
           set -euo pipefail

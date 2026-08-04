@@ -8,7 +8,7 @@ RENDER_CP := /tmp/$(CONTROLPLANE).rendered.yaml
 RENDER_TLS := /tmp/$(UMBRELLA).tls.rendered.yaml
 RENDER_OBS := /tmp/$(UMBRELLA).observability.rendered.yaml
 
-.PHONY: build-deps lint template kubeconform template-controlplane kubeconform-controlplane template-tls kubeconform-tls template-observability kubeconform-observability check check-tls check-observability clean
+.PHONY: build-deps lint template kubeconform template-controlplane kubeconform-controlplane template-tls kubeconform-tls template-observability kubeconform-observability check-service-selectors check check-tls check-observability clean
 
 # control-plane has its own file:// dep (postgresql) and observability has its
 # own upstream deps (kube-prometheus-stack + loki); build them first so the
@@ -53,7 +53,10 @@ template-tls: build-deps
 kubeconform-tls: template-tls
 	kubeconform -strict -kubernetes-version 1.31.0 -ignore-missing-schemas $(RENDER_TLS)
 
-check: lint kubeconform kubeconform-controlplane kubeconform-observability
+check-service-selectors:
+	./scripts/check-service-selectors.sh
+
+check: lint kubeconform kubeconform-controlplane kubeconform-observability check-service-selectors
 
 check-tls: kubeconform-tls
 

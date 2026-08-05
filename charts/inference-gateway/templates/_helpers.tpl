@@ -2,6 +2,16 @@
 {{- printf "%s-gateway" .Release.Name -}}
 {{- end -}}
 
+{{- /* The supervisor mTLS workload listener (HOR-398) serving leaf Secret name. */ -}}
+{{- define "inference-gateway.workloadTLSSecretName" -}}
+{{- .Values.workload.tlsSecretName | default (printf "%s-gateway-workload-tls" .Release.Name) -}}
+{{- end -}}
+
+{{- /* The platform workflow CA Secret that worker leaves are chained to (client CA). */ -}}
+{{- define "inference-gateway.workloadCASecretName" -}}
+{{- .Values.workload.clientCASecretName | default (printf "%s-control-plane-gateway-ca" .Release.Name) -}}
+{{- end -}}
+
 {{- define "inference-gateway.adminSecretName" -}}
 {{- if .Values.adminApiKey.secret -}}{{- .Values.adminApiKey.secret -}}{{- else -}}{{- printf "%s-gateway-admin" .Release.Name -}}{{- end -}}
 {{- end -}}

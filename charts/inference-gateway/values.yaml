@@ -65,6 +65,28 @@ adminApiKey:
   secret: "" # default: <release>-gateway-admin
   key: adminApiKey
 
+# Supervisor mTLS workload listener (HOR-398). Default OFF; an overlay opts in
+# when AgentPool workers (SPIFFE leaves from the shared platform workflow CA)
+# must reach the private model path at <port>/v1/chat/completions. Requires a
+# serving leaf signed by the same CA + that CA mounted as the client CA.
+workload:
+  enabled: false
+  port: 8443
+  servicePort: 8443
+  trustDomain: iterabase.local
+  # The serving leaf: rendered as a cert-manager Certificate referencing the
+  # platform workflow CA (issuer below). Secret holds tls.crt/tls.key.
+  tlsSecretName: "" # default: <release>-gateway-workload-tls
+  issuer:
+    name: platform-spiffe-ca   # ClusterIssuer backing AgentPool worker leaves
+    kind: ClusterIssuer
+  # The platform workflow CA cert worker leaves are chained to (client CA).
+  # Default: <release>-control-plane-gateway-ca (the secret backing the issuer).
+  clientCASecretName: "" # default: <release>-control-plane-gateway-ca
+  clientCAKey: ca.crt
+  certMountPath: /etc/iterabase/workload/tls
+  clientCAMountPath: /etc/iterabase/workload/ca
+
 resources: {}
 
 # Metrics (opt-in; flip on with observability — see values-observability.yaml).

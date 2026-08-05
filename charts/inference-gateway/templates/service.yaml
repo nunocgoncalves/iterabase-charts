@@ -13,4 +13,9 @@ spec:
     - name: http
       port: {{ .Values.service.port }}
       targetPort: http
+    {{- if .Values.workload.enabled }}
+    - name: workload
+      port: {{ .Values.workload.servicePort }}
+      targetPort: workload
+    {{- end }}
 {{- end }}

@@ -157,4 +157,18 @@ subjects:
     name: {{ include "control-plane.gatewayServiceAccountName" . }}
     namespace: {{ .Release.Namespace }}
 {{- end }}
+{{- if .Values.dispatch.enabled }}
+---
+# The dispatch Work server connects only to Postgres (PGPASSWORD + DATABASE_URL
+# from Secrets mounted as volumes/SecretKeyRef, resolved by kubelet) and serves
+# mTLS traffic; it never calls the Kubernetes API, so it gets a bare, least-
+# privilege ServiceAccount with no Role bindings.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "control-plane.dispatchServiceAccountName" . }}
+  labels:
+    {{- include "control-plane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dispatch
+{{- end }}
 {{- end }}

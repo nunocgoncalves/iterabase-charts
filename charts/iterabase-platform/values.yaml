@@ -57,6 +57,10 @@ control-plane:
   enabled: true # provides the shared pgvector Postgres + the schemas the gateway reads
   gateway:
     enabled: true # mTLS workload/tool/artifact service; generated CA is stable across upgrades
+  dispatch:
+    enabled: true # durable Work bidi-stream server (HOR-249); AgentPool workers connect over mTLS
+    # defaultModel.id/api are CUSTOMER-SPECIFIC and set by the overlay (a
+    # dispatch enabled without them fails closed at startup) — not baked here.
   toolRunner:
     enabled: true # Node 24 runner + exact Flux GitRepository artifact generations (HOR-397)
     allowedToolNamespaces: [platform] # overlays add reviewed namespaces (for example graph/client)

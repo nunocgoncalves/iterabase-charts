@@ -161,6 +161,18 @@ digest before Helm. Generic chart-only CI disables the runner because it has no
 cross-repository runner image or Flux source; the dedicated kind+Flux contract
 covers the enabled runtime path.
 
+**Dispatch (Work server).** The control-plane chart deploys the durable Work
+bidi-stream gRPC server (HOR-249) at `control-plane.dispatch.*`, enabled by
+default in the umbrella. AgentPool/warm-agent workers connect over mTLS, receive
+durable graph-node assignments and return completion events. Its serving leaf is
+signed by the shared platform workload CA (`platform-spiffe-ca`) with the
+Dispatch Service name as a SAN, so a worker's `controlPlane.serverName` matches
+it and its client CA verifies the worker's SPIFFE leafs. The default model
+permission (`control-plane.dispatch.defaultModel.id/api`) is
+**customer/overlay-specific** and is set by the overlay — a dispatch enabled
+without one fails closed at startup (it never emits an empty model permission),
+so the shared umbrella does not hardcode a model.
+
 ## Immutable artifacts
 
 The MinIO chart provisions `iterabase-artifacts` plus a dedicated bucket-scoped

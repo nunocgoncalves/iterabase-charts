@@ -14,12 +14,24 @@
 {{- printf "%s-control-plane-gateway" .Release.Name -}}
 {{- end -}}
 
+{{- define "control-plane.dispatchName" -}}
+{{- printf "%s-control-plane-dispatch" .Release.Name -}}
+{{- end -}}
+
+{{- define "control-plane.dispatchTLSSecretName" -}}
+{{- default (printf "%s-control-plane-dispatch-tls" .Release.Name) .Values.dispatch.tls.serverSecret -}}
+{{- end -}}
+
 {{- define "control-plane.serviceAccountName" -}}
 {{- printf "%s-control-plane-manager" .Release.Name -}}
 {{- end -}}
 
 {{- define "control-plane.gatewayServiceAccountName" -}}
 {{- printf "%s-control-plane-gateway" .Release.Name -}}
+{{- end -}}
+
+{{- define "control-plane.dispatchServiceAccountName" -}}
+{{- printf "%s-control-plane-dispatch" .Release.Name -}}
 {{- end -}}
 
 {{- define "control-plane.toolRunnerName" -}}
@@ -108,6 +120,10 @@ gateway:
 
 {{- define "control-plane.gatewayCASecretName" -}}
 {{- default (printf "%s-control-plane-gateway-ca" .Release.Name) .Values.gateway.tls.clientCASecret -}}
+{{- end -}}
+
+{{- define "control-plane.spiffeCASecretName" -}}
+{{- include "control-plane.gatewayCASecretName" . -}}
 {{- end -}}
 
 {{- define "control-plane.apiTLSSecretName" -}}

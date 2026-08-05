@@ -37,6 +37,29 @@ gateway:
     clusterResourceNamespace: ""
   resources: {}
 
+dispatch:
+  # The durable Work bidi-stream gRPC server (HOR-249): warm-agent workers
+  # connect over mTLS, receive durable graph-node assignments and return
+  # completion events. Standalone installs opt in after providing cert-manager
+  # and the shared workload CA (platform-spiffe-ca, provisioned with the
+  # gateway or dispatch). The umbrella enables it by default.
+  enabled: false
+  addr: ":8091"
+  service:
+    port: 8091
+  trustDomain: iterabase.local
+  # Every AssignTurn carries a model permission; dispatch refuses to run
+  # without a configured default model (DISPATCH_DEFAULT_MODEL_ID/API). The
+  # default model is CUSTOMER/OVERLAY-SPECIFIC (there is no universal default
+  # id/api) — leave empty here and set it in the overlay that enables dispatch.
+  defaultModel:
+    id: ""
+    api: ""
+  tls:
+    generated: true
+    serverSecret: "" # default: <release>-control-plane-dispatch-tls
+  resources: {}
+
 toolRunner:
   enabled: false # umbrella enables; requires gateway + Flux GitRepository
   image:

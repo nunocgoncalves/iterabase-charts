@@ -24,6 +24,24 @@ grep -q 'kind: ServiceMonitor' <<<"$render"
 grep -q 'port: mat-metrics' <<<"$render"
 grep -q 'port: run-metrics' <<<"$render"
 
+# The gateway consumes its static runner allow-list only at startup. The pod
+# template checksum must change when an operator approves another namespace so
+# a normal Helm reconcile rolls the Deployment without Forge special-casing it.
+changed_render=$(helm template runner-check charts/control-plane \
+  --set postgresql.enabled=false \
+  --set gateway.enabled=true \
+  --set toolRunner.enabled=true \
+  --set toolRunner.metrics.enabled=true \
+  --set 'toolRunner.allowedToolNamespaces={platform,graph,client}')
+gateway_checksum() {
+  sed -n 's/.*checksum\/gateway-config: "\([a-f0-9]\{64\}\)".*/\1/p' <<<"$1"
+}
+checksum=$(gateway_checksum "$render")
+changed_checksum=$(gateway_checksum "$changed_render")
+test -n "$checksum"
+test -n "$changed_checksum"
+test "$checksum" != "$changed_checksum"
+
 # Only materializer receives the projected kube-api mount; only runner receives
 # mTLS material. Split the two container blocks for credential-boundary checks.
 materializer=$(awk '/- name: materializer/{p=1} /- name: runner/{p=0} p' <<<"$render")
@@ -34,4 +52,4 @@ grep -q 'name: runner-tls' <<<"$runner"
 ! grep -q 'name: kube-api' <<<"$runner"
 grep -q 'rm -f /control/runner-ready; exec node /app/dist/main.js run' <<<"$runner"
 
-echo "OK: tool runner renders with exact SPIFFE/Flux scoping, process-lifetime readiness, bounded generations, read-only artifacts, split credentials, and Prometheus scraping"
+echo "OK: tool runner renders with exact SPIFFE/Flux scoping, config-triggered gateway rollout, process-lifetime readiness, bounded generations, read-only artifacts, split credentials, and Prometheus scraping"

@@ -89,6 +89,19 @@ postgres://{{ .Values.postgresql.auth.username }}:$(PGPASSWORD)@{{ include "cont
 {{- end }}
 {{- end -}}
 
+{{- define "control-plane.gatewayConfig" -}}
+gateway:
+  inline_limit: {{ .Values.gateway.inlineLimit }}
+  {{- if .Values.toolRunner.enabled }}
+  approved_runners:
+    - namespace: {{ .Release.Namespace | quote }}
+      runner_id: {{ .Values.toolRunner.runnerId | quote }}
+      spiffe_id: {{ printf "spiffe://%s/tool-runners/%s/%s" .Values.gateway.trustDomain .Release.Namespace .Values.toolRunner.runnerId | quote }}
+      allowed_tool_namespaces:
+        {{- toYaml (required "toolRunner.allowedToolNamespaces is required" .Values.toolRunner.allowedToolNamespaces) | nindent 8 }}
+  {{- end }}
+{{- end -}}
+
 {{- define "control-plane.gatewayTLSSecretName" -}}
 {{- default (printf "%s-control-plane-gateway-tls" .Release.Name) .Values.gateway.tls.serverSecret -}}
 {{- end -}}

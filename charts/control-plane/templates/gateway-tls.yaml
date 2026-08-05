@@ -1,4 +1,11 @@
-{{- if and .Values.enabled .Values.gateway.enabled .Values.gateway.tls.generated }}
+{{- /* The shared platform workload CA + ClusterIssuer (ARCH: the gateway,
+     dispatch Work server, and tool-runner workload-identity substrate).
+     Provisioned when either the gateway or the dispatch Work server (or both)
+     is enabled; each mTLS service also signs its own serving leaf from this
+     CA. AgentPool worker leaves are issued from the same CA (the controller's
+     CSI volume references the platform-spiffe-ca ClusterIssuer name), so the
+     CA private key remains in Kubernetes and warm workers verify the server
+     chains against it. */ -}}
 {{- $caName := include "control-plane.gatewayCASecretName" . }}
 {{- $tlsName := include "control-plane.gatewayTLSSecretName" . }}
 {{- $clusterResourceNamespace := default .Release.Namespace .Values.gateway.tls.clusterResourceNamespace }}
@@ -7,6 +14,7 @@
 {{- if $existingCA }}
 {{- $ca = buildCustomCert (index $existingCA.data "tls.crt") (index $existingCA.data "tls.key") }}
 {{- end }}
+{{- if and .Values.enabled (or .Values.gateway.enabled .Values.dispatch.enabled) }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -45,7 +53,11 @@ data:
   tls.crt: {{ $ca.Cert | b64enc | quote }}
   tls.key: {{ $ca.Key | b64enc | quote }}
 {{- end }}
+{{- end }}
+{{- if and .Values.enabled .Values.gateway.enabled .Values.gateway.tls.generated }}
 ---
+# The gateway's serving leaf, signed by the shared workload CA. Stable across
+# upgrades (helm lookup preserves the live Secret).
 {{- $existingTLS := lookup "v1" "Secret" .Release.Namespace $tlsName }}
 {{- $gatewayName := include "control-plane.gatewayName" . }}
 {{- $dnsNames := list $gatewayName (printf "%s.%s" $gatewayName .Release.Namespace) (printf "%s.%s.svc" $gatewayName .Release.Namespace) (printf "%s.%s.svc.cluster.local" $gatewayName .Release.Namespace) }}
@@ -67,10 +79,13 @@ data:
   tls.crt: {{ $gatewayCert.Cert | b64enc | quote }}
   tls.key: {{ $gatewayCert.Key | b64enc | quote }}
 {{- end }}
+{{- end }}
+{{- if and .Values.enabled (or .Values.gateway.enabled .Values.dispatch.enabled) }}
 ---
-# AgentPool worker leaves are issued from the same CA the gateway trusts for
-# client authentication. The controller's CSI volume intentionally references
-# this stable ClusterIssuer name; the CA private key remains in Kubernetes.
+# AgentPool worker leaves are issued from the same CA the gateway/dispatch
+# trust for client authentication. The controller's CSI volume intentionally
+# references this stable ClusterIssuer name; the CA private key remains in
+# Kubernetes.
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:

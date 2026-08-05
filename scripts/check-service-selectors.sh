@@ -31,3 +31,5 @@ assert_service_selector postgresql exporter.yaml exporter
 assert_service_selector redis service.yaml cache
 assert_service_selector redis exporter.yaml exporter
 assert_service_selector control-plane gateway.yaml gateway --set gateway.enabled=true
+assert_service_selector control-plane dispatch.yaml dispatch \
+  --set dispatch.enabled=true --set dispatch.defaultModel.id=test --set dispatch.defaultModel.api=test

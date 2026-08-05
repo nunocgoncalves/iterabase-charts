@@ -126,6 +126,8 @@ jobs:
             --set external-dns.enabled=false \
             --set control-plane.image.tag=0.0.18 \
             --set control-plane.toolRunner.enabled=false \
+            --set control-plane.dispatch.defaultModel.id=test-model \
+            --set control-plane.dispatch.defaultModel.api=test \
             --wait --timeout 12m
       - name: validate control-plane manager CRDs, RBAC, and cache stability
         run: |
@@ -340,6 +342,8 @@ jobs:
             --set external-dns.enabled=false \
             --set control-plane.image.tag=0.0.18 \
             --set control-plane.toolRunner.enabled=false \
+            --set control-plane.dispatch.defaultModel.id=test-model \
+            --set control-plane.dispatch.defaultModel.api=test \
             --wait --timeout 15m
       - name: assert the four stack components + promtail + exporters are ready
         run: |
@@ -542,6 +546,8 @@ jobs:
             --set external-dns.enabled=false \
             --set control-plane.image.tag=0.0.18 \
             --set control-plane.toolRunner.enabled=false \
+            --set control-plane.dispatch.defaultModel.id=test-model \
+            --set control-plane.dispatch.defaultModel.api=test \
             --wait --timeout 15m
       - name: debug pods on failure
         if: failure()

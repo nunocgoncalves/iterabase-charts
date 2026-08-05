@@ -8,16 +8,7 @@ metadata:
     app.kubernetes.io/component: gateway
 data:
   gateway.yaml: |
-    gateway:
-      inline_limit: {{ .Values.gateway.inlineLimit }}
-      {{- if .Values.toolRunner.enabled }}
-      approved_runners:
-        - namespace: {{ .Release.Namespace | quote }}
-          runner_id: {{ .Values.toolRunner.runnerId | quote }}
-          spiffe_id: {{ printf "spiffe://%s/tool-runners/%s/%s" .Values.gateway.trustDomain .Release.Namespace .Values.toolRunner.runnerId | quote }}
-          allowed_tool_namespaces:
-            {{- toYaml (required "toolRunner.allowedToolNamespaces is required" .Values.toolRunner.allowedToolNamespaces) | nindent 12 }}
-      {{- end }}
+    {{- include "control-plane.gatewayConfig" . | nindent 4 }}
 ---
 apiVersion: v1
 kind: Service
@@ -57,6 +48,9 @@ spec:
         app.kubernetes.io/instance: {{ .Release.Name }}
         app.kubernetes.io/component: gateway
       annotations:
+        # The gateway reads approved runner identities/namespaces only at startup.
+        # Roll whenever the exact rendered static config changes.
+        checksum/gateway-config: {{ include "control-plane.gatewayConfig" . | sha256sum | quote }}
         # The gateway loads its mandatory mTLS leaf and client CA at startup.
         reloader.stakater.com/auto: "true"
     spec:

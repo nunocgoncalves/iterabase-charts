@@ -335,6 +335,7 @@ spec:
                     enum:
                     - graph_email
                     - operator_artifact
+                    - manual_api
                     type: string
                 required:
                 - type

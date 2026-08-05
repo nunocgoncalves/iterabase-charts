@@ -96,14 +96,14 @@ spec:
               value: {{ .Values.dispatch.trustDomain | quote }}
             {{- /* The default model permission is customer/overlay-specific (there
                  is no universal default model id/api). Rendered only when the
-                 overlay sets dispatch.defaultModel.id/api; an enabled dispatch
-                 with neither fails closed at startup (ValidateDispatchServe) so
-                 no empty model permission is ever emitted (HOR-249). */ -}}
-            {{- if .Values.dispatch.defaultModel.id }}
+                 overlay sets BOTH dispatch.defaultModel.id AND api; a partial
+                 config (only one set) is rejected at render rather than emitting
+                 an invalid model permission at runtime (HOR-249). An enabled
+                 dispatch with neither also fails closed at startup
+                 (ValidateDispatchServe). */ -}}
+            {{- if and .Values.dispatch.defaultModel.id .Values.dispatch.defaultModel.api }}
             - name: DISPATCH_DEFAULT_MODEL_ID
               value: {{ .Values.dispatch.defaultModel.id | quote }}
-            {{- end }}
-            {{- if .Values.dispatch.defaultModel.api }}
             - name: DISPATCH_DEFAULT_MODEL_API
               value: {{ .Values.dispatch.defaultModel.api | quote }}
             {{- end }}
